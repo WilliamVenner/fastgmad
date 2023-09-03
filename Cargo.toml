@@ -1,0 +1,28 @@
+[package]
+name = "fastgmad"
+version = "0.1.0"
+edition = "2021"
+
+[lib]
+bench = false
+
+[[bin]]
+name = "fastgmad"
+path = "src/main.rs"
+bench = false
+
+[[bench]]
+name = "create_gma_benchmark"
+harness = false
+
+[dependencies]
+rayon = "1"
+walkdir = "2"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+
+[dev-dependencies]
+criterion = { version = "0.5", features = ["html_reports"] }
+uuid = { version = "1", features = ["v4"] }
+sysreq = "0.1"
+zip = "0.6"
