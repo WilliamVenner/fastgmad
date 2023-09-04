@@ -31,4 +31,4 @@ macro_rules! perf {
 	([$name:literal] => $code:expr) => {$code};
 }
 
-pub struct PrintHelp;
+pub struct PrintHelp(pub Option<&'static str>);

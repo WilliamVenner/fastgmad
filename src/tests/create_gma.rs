@@ -1,11 +1,12 @@
 use std::{fs::File, io::BufWriter, path::Path};
+use lazy_static::lazy_static;
 use uuid::Uuid;
 
 mod fastgmad {
 	pub(super) use crate::*;
 }
 
-lazy_static::lazy_static! {
+lazy_static! {
 	static ref TEMP_FILE_PATH: &'static Path = {
 		let path = std::env::temp_dir().join(format!("fastgmad-tests/create-gmad/{}.gma", Uuid::new_v4()));
 		{
@@ -26,14 +27,22 @@ fn temp_file() -> BufWriter<File> {
 macro_rules! create_gma_tests {
 	($($addon:expr => [$standard:ident, $parallel:ident]),*) => {
 		$(
+			lazy_static! {
+				static ref CREATE_GMA_CONFIG: CreateGmadConfig = {
+					let mut config = CreateGmadConfig::default();
+					config.folder = PathBuf::from($addon);
+					config
+				};
+			}
+
 			#[test]
 			fn $standard() {
-				fastgmad::create::standard::create_gma(fastgmad::create::conf::CreateGmadConfig::DEFAULT, $addon, &mut temp_file()).unwrap();
+				fastgmad::create::standard::create_gma(&*CREATE_GMA_CONFIG, &mut temp_file()).unwrap();
 			}
 
 			#[test]
 			fn $parallel() {
-				fastgmad::create::parallel::create_gma(fastgmad::create::conf::CreateGmadConfig::DEFAULT, $addon, &mut temp_file()).unwrap();
+				fastgmad::create::parallel::create_gma(&*CREATE_GMA_CONFIG, &mut temp_file()).unwrap();
 			}
 		)*
 	};

@@ -2,7 +2,7 @@ use criterion::{criterion_group, criterion_main, Criterion};
 use std::{
 	fs::File,
 	io::BufWriter,
-	process::{Command, Stdio},
+	process::{Command, Stdio}, path::PathBuf,
 };
 use uuid::Uuid;
 
@@ -27,17 +27,20 @@ fn criterion_benchmark(c: &mut Criterion) {
 	let temp_file = || BufWriter::new(File::create(temp_file_path()).unwrap());
 
 	for (group_name, addon_dir) in [("Create Wiremod GMA", wiremod_dir), ("Create CS2 Weapon Props GMA", cs2weaponprops_dir)] {
+		let conf = Box::leak(Box::new(fastgmad::create::conf::CreateGmadConfig::default()));
+		conf.folder = PathBuf::from(addon_dir);
+
 		let mut group = c.benchmark_group(group_name);
 		group.sample_size(10);
 		group.sampling_mode(criterion::SamplingMode::Flat);
 		group.bench_function("Standard", |b| {
 			b.iter(|| {
-				fastgmad::create::standard::create_gma(fastgmad::create::conf::CreateGmadConfig::DEFAULT, addon_dir, &mut temp_file()).unwrap();
+				fastgmad::create::standard::create_gma(conf, &mut temp_file()).unwrap();
 			});
 		});
 		group.bench_function("Parallel", |b| {
 			b.iter(|| {
-				fastgmad::create::parallel::create_gma(fastgmad::create::conf::CreateGmadConfig::DEFAULT, addon_dir, &mut temp_file()).unwrap();
+				fastgmad::create::parallel::create_gma(conf, &mut temp_file()).unwrap();
 			});
 		});
 		group.bench_function("GMAD", |b| {

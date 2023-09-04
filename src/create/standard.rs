@@ -2,7 +2,7 @@ use crate::{util::WriteEx, whitelist, create::{AddonJson, conf::CreateGmadConfig
 use std::{
 	fs::File,
 	io::{BufReader, Write},
-	path::{Path, PathBuf},
+	path::PathBuf,
 	time::SystemTime,
 };
 
@@ -12,12 +12,12 @@ struct GmaFileEntry {
 	size: u64,
 }
 
-pub fn create_gma_with_done_callback(conf: &'static CreateGmadConfig, dir: &str, w: &mut impl Write, done_callback: fn()) -> Result<(), std::io::Error> {
-	let addon_json = perf!(["addon.json"] => AddonJson::read(&Path::new(dir).join("addon.json"))?);
+pub fn create_gma_with_done_callback(conf: &'static CreateGmadConfig, w: &mut impl Write, done_callback: &mut dyn FnMut()) -> Result<(), anyhow::Error> {
+	let addon_json = perf!(["addon.json"] => AddonJson::read(&conf.folder.join("addon.json"))?);
 
 	let entries = perf!(["entry discovery"] => {
 		let mut entries = Vec::new();
-		for entry in walkdir::WalkDir::new(dir).follow_links(true).sort_by_file_name() {
+		for entry in walkdir::WalkDir::new(&conf.folder).follow_links(true).sort_by_file_name() {
 			let entry = entry?;
 			if !entry.file_type().is_file() {
 				continue;
@@ -25,7 +25,7 @@ pub fn create_gma_with_done_callback(conf: &'static CreateGmadConfig, dir: &str,
 
 			let path = entry.path();
 			let relative_path = path
-				.strip_prefix(Path::new(dir))
+				.strip_prefix(&conf.folder)
 				.map_err(|_| std::io::Error::new(std::io::ErrorKind::InvalidData, format!("File {:?} not in addon directory", path)))?
 				.to_str()
 				.ok_or_else(|| std::io::Error::new(std::io::ErrorKind::InvalidData, format!("File path {:?} not valid UTF-8", path)))?
@@ -41,7 +41,7 @@ pub fn create_gma_with_done_callback(conf: &'static CreateGmadConfig, dir: &str,
 
 			if !whitelist::check(&relative_path) {
 				if conf.warn_invalid {
-					println!("Warning: File {} not in GMA whitelist - see https://wiki.facepunch.com/gmod/Workshop_Addon_Creation", relative_path);
+					eprintln!("Warning: File {} not in GMA whitelist - see https://wiki.facepunch.com/gmod/Workshop_Addon_Creation", relative_path);
 					continue;
 				} else {
 					return Err(std::io::Error::new(
@@ -50,7 +50,7 @@ pub fn create_gma_with_done_callback(conf: &'static CreateGmadConfig, dir: &str,
 							"File {} not in GMA whitelist - see https://wiki.facepunch.com/gmod/Workshop_Addon_Creation",
 							relative_path
 						),
-					));
+					).into());
 				}
 			}
 
@@ -134,6 +134,6 @@ pub fn create_gma_with_done_callback(conf: &'static CreateGmadConfig, dir: &str,
 	Ok(())
 }
 
-pub fn create_gma(conf: &'static CreateGmadConfig, dir: &str, w: &mut impl Write) -> Result<(), std::io::Error> {
-	create_gma_with_done_callback(conf, dir, w, || ())
+pub fn create_gma(conf: &'static CreateGmadConfig, w: &mut impl Write) -> Result<(), anyhow::Error> {
+	create_gma_with_done_callback(conf, w, &mut || ())
 }
