@@ -2,10 +2,14 @@ mod fastgmad {
 	pub(super) use crate::*;
 }
 
-use std::{fs::File, io::{BufWriter, BufReader}, path::{Path, PathBuf}};
-use lazy_static::lazy_static;
-use uuid::Uuid;
 use fastgmad::{create::CreateGmadConfig, extract::ExtractGmadConfig};
+use lazy_static::lazy_static;
+use std::{
+	fs::File,
+	io::{BufReader, BufWriter},
+	path::{Path, PathBuf},
+};
+use uuid::Uuid;
 
 macro_rules! create_gma_tests {
 	($($addon:expr => [$standard:ident, $parallel:ident]),*) => {

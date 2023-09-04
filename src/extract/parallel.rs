@@ -10,11 +10,7 @@ use std::{
 	sync::{atomic::AtomicUsize, Mutex},
 };
 
-pub fn extract_gma_with_done_callback(
-	conf: &ExtractGmadConfig,
-	r: &mut impl BufRead,
-	done_callback: &mut dyn FnMut(),
-) -> Result<(), anyhow::Error> {
+pub fn extract_gma_with_done_callback(conf: &ExtractGmadConfig, r: &mut impl BufRead, done_callback: &mut dyn FnMut()) -> Result<(), anyhow::Error> {
 	if conf.out.is_dir() {
 		eprintln!("warning: output directory already exists; files not present in this GMA but present in the existing output directory will not be deleted");
 	}
@@ -79,9 +75,9 @@ pub fn extract_gma_with_done_callback(
 		};
 
 		let size = r.read_i64::<LE>()?;
-		let crc = r.read_u32::<LE>()?;
+		let _crc = r.read_u32::<LE>()?;
 
-		if let Some(entry) = GmaEntry::try_new(&conf.out, path, size, crc) {
+		if let Some(entry) = GmaEntry::try_new(&conf.out, path, size) {
 			file_index.push(entry);
 		}
 	}
@@ -92,10 +88,10 @@ pub fn extract_gma_with_done_callback(
 	std::thread::scope(|s| {
 		let mut r = r;
 
-		for GmaEntry { path, size, crc } in file_index.iter() {
+		for GmaEntry { path, size } in file_index.iter() {
 			// Break early if an error occurs
 			match error.try_lock().as_deref() {
-				Ok(None) => {},
+				Ok(None) => {}
 				Ok(Some(_)) | Err(std::sync::TryLockError::WouldBlock) => break,
 				Err(err @ std::sync::TryLockError::Poisoned(_)) => Err(err).unwrap(),
 			}

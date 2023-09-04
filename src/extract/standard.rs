@@ -78,15 +78,15 @@ pub fn extract_gma_with_done_callback(
 		};
 
 		let size = r.read_i64::<LE>()?;
-		let crc = r.read_u32::<LE>()?;
+		let _crc = r.read_u32::<LE>()?;
 
-		if let Some(entry) = GmaEntry::try_new(&conf.out, path, size, crc) {
+		if let Some(entry) = GmaEntry::try_new(&conf.out, path, size) {
 			file_index.push(entry);
 		}
 	}
 
 	// File contents
-	for GmaEntry { path, size, crc } in file_index.iter() {
+	for GmaEntry { path, size } in file_index.iter() {
 		if let Some(parent) = path.parent() {
 			if parent != conf.out {
 				std::fs::create_dir_all(parent)?;

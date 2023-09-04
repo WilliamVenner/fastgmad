@@ -2,7 +2,8 @@ use criterion::{criterion_group, criterion_main, Criterion};
 use std::{
 	fs::File,
 	io::BufWriter,
-	process::{Command, Stdio}, path::PathBuf,
+	path::PathBuf,
+	process::{Command, Stdio},
 };
 use uuid::Uuid;
 

@@ -1,4 +1,7 @@
-use std::{path::{PathBuf, Path, Component}, borrow::Cow};
+use std::{
+	borrow::Cow,
+	path::{Component, Path, PathBuf},
+};
 
 pub mod parallel;
 pub mod standard;
@@ -15,10 +18,12 @@ struct StubAddonJson<'a> {
 struct GmaEntry<Size> {
 	path: PathBuf,
 	size: Size,
-	crc: u32
 }
-impl<Size> GmaEntry<Size> where Size: TryFrom<i64> {
-	fn try_new(base_path: &Path, path: Vec<u8>, size: i64, crc: u32) -> Option<Self> {
+impl<Size> GmaEntry<Size>
+where
+	Size: TryFrom<i64>,
+{
+	fn try_new(base_path: &Path, path: Vec<u8>, size: i64) -> Option<Self> {
 		let size = match Size::try_from(size) {
 			Ok(size) => size,
 			Err(_) => {
@@ -30,7 +35,10 @@ impl<Size> GmaEntry<Size> where Size: TryFrom<i64> {
 		let path = match String::from_utf8(path) {
 			Ok(path) => path,
 			Err(err) => {
-				eprintln!("warning: skipping GMA entry with non-UTF-8 file path: {:?}", String::from_utf8_lossy(err.as_bytes()));
+				eprintln!(
+					"warning: skipping GMA entry with non-UTF-8 file path: {:?}",
+					String::from_utf8_lossy(err.as_bytes())
+				);
 				return None;
 			}
 		};
@@ -44,6 +52,6 @@ impl<Size> GmaEntry<Size> where Size: TryFrom<i64> {
 			base_path.join(path)
 		};
 
-		Some(Self { path, size, crc })
+		Some(Self { path, size })
 	}
 }

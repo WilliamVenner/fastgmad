@@ -14,5 +14,4 @@ pub mod whitelist;
 
 pub use util::PrintHelp;
 
-// TODO crc
 // TODO error struct with file path context and stuff

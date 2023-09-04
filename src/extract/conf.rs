@@ -45,15 +45,15 @@ impl ExtractGmadConfig {
 						.ok_or(PrintHelp(Some("Expected integer greater than zero for -max-io-memory-usage")))?;
 				}
 				"-out" => {
-					config.out = PathBuf::from(
-						args.next().ok_or(PrintHelp(Some("Expected a value after -out")))?,
-					);
+					config.out = PathBuf::from(args.next().ok_or(PrintHelp(Some("Expected a value after -out")))?);
 				}
 				"-stdin" => {
 					r#in = Some(ExtractGmadIn::Stdin);
 				}
 				"-file" => {
-					r#in = Some(ExtractGmadIn::File(args.next().map(PathBuf::from).ok_or(PrintHelp(Some("Expected a value after -folder")))?));
+					r#in = Some(ExtractGmadIn::File(
+						args.next().map(PathBuf::from).ok_or(PrintHelp(Some("Expected a value after -folder")))?,
+					));
 				}
 				_ => return Err(PrintHelp(Some("Unknown argument"))),
 			}

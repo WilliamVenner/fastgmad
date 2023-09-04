@@ -1,4 +1,8 @@
-use crate::{util::WriteEx, whitelist, create::{AddonJson, conf::CreateGmadConfig}};
+use crate::{
+	create::{conf::CreateGmadConfig, AddonJson},
+	util::WriteEx,
+	whitelist,
+};
 use std::{
 	fs::File,
 	io::{BufReader, Write},

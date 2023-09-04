@@ -1,7 +1,7 @@
 use crate::{create::conf::CreateGmadConfig, create::AddonJson, util::WriteEx, whitelist};
 use std::{
 	fs::File,
-	io::{Read, Seek, SeekFrom, Write, BufReader},
+	io::{BufReader, Read, Seek, SeekFrom, Write},
 	path::PathBuf,
 	sync::{atomic::AtomicUsize, Arc, Condvar, Mutex},
 	time::SystemTime,

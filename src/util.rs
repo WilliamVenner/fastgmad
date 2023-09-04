@@ -1,4 +1,4 @@
-use std::io::{Write, BufRead};
+use std::io::{BufRead, Write};
 
 pub trait WriteEx: Write {
 	fn write_nul_str(&mut self, bytes: &[u8]) -> Result<(), std::io::Error>;
@@ -66,7 +66,9 @@ macro_rules! perf {
 #[allow(unused)]
 #[macro_export]
 macro_rules! perf {
-	([$name:literal] => $code:expr) => {$code};
+	([$name:literal] => $code:expr) => {
+		$code
+	};
 }
 
 pub struct PrintHelp(pub Option<&'static str>);
