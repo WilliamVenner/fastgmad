@@ -31,7 +31,7 @@ impl PartialEq for GmaFileEntry {
 }
 
 pub fn create_gma_with_done_callback(
-	conf: &'static CreateGmadConfig,
+	conf: &CreateGmadConfig,
 	w: &mut (impl Write + Seek),
 	done_callback: &mut dyn FnMut(),
 ) -> Result<(), anyhow::Error> {
@@ -148,7 +148,7 @@ pub fn create_gma_with_done_callback(
 	// Write entries
 	// TODO memory limiting
 	let queue = perf!(["write entries"] => {
-		const IO_THREAD_STACK_SIZE: usize = 2048;
+		let contents_ptr = w.stream_position()?;
 
 		struct EntriesQueue {
 			head: AtomicUsize,
@@ -171,71 +171,76 @@ pub fn create_gma_with_done_callback(
 		});
 
 		let queue = Arc::new(EntriesQueue { entries: buffered_entries, head: AtomicUsize::new(0), memory_usage: Mutex::new(0), memory_usage_cvar: Condvar::new() });
-		for _ in 0..queue.entries.len().min(conf.max_io_threads.get()) {
-			let queue = queue.clone();
-			let tx = tx.clone();
-			if std::thread::Builder::new().stack_size(IO_THREAD_STACK_SIZE).spawn(move || {
-				while let Some(GmaFileEntry { offset, path, size, .. }) = queue.next() {
-					let mut cur_offset = *offset;
-					let max_offset = *offset + size;
+		std::thread::scope(|scope| {
+			const IO_THREAD_STACK_SIZE: usize = 2048;
 
-					let mut f = match File::open(path) {
-						Ok(f) => f,
-						Err(err) => {
-							tx.send(Err(err)).ok();
-							return;
-						}
-					};
+			for _ in 0..queue.entries.len().min(conf.max_io_threads.get()) {
+				let queue = queue.clone();
+				let tx = tx.clone();
+				if std::thread::Builder::new().stack_size(IO_THREAD_STACK_SIZE).spawn_scoped(scope, move || {
+					while let Some(GmaFileEntry { offset, path, size, .. }) = queue.next() {
+						let mut cur_offset = *offset;
+						let max_offset = *offset + size;
 
-					while cur_offset < max_offset {
-						let mut memory_usage = queue.memory_usage_cvar.wait_while(queue.memory_usage.lock().unwrap(), |memory_usage| *memory_usage > 0 && *memory_usage + *size as usize >= conf.max_io_memory_usage.get()).unwrap();
-
-						let res = {
-							let available_memory = (conf.max_io_memory_usage.get() - *memory_usage) as u64;
-							if available_memory >= *size {
-								*memory_usage += *size as usize;
-								drop(memory_usage);
-
-								cur_offset += *size;
-
-								let mut buf = Vec::with_capacity(*size as usize);
-								f.read_to_end(&mut buf).map(|_| buf)
-							} else {
-								let will_read = available_memory.min(max_offset - cur_offset);
-
-								*memory_usage += will_read as usize;
-								drop(memory_usage);
-
-								cur_offset += will_read;
-
-								let mut buf = Vec::with_capacity(will_read as usize);
-								(&mut f).take(will_read).read_to_end(&mut buf).map(|_| buf)
+						let mut f = match File::open(path) {
+							Ok(f) => f,
+							Err(err) => {
+								tx.send(Err(err)).ok();
+								return;
 							}
 						};
 
-						if tx.send(res.map(|contents| (cur_offset, contents))).is_err() {
-							return;
+						while cur_offset < max_offset {
+							let mut memory_usage = queue.memory_usage_cvar.wait_while(queue.memory_usage.lock().unwrap(), |memory_usage| *memory_usage > 0 && *memory_usage + *size as usize >= conf.max_io_memory_usage.get()).unwrap();
+
+							let res = {
+								let available_memory = (conf.max_io_memory_usage.get() - *memory_usage) as u64;
+								if available_memory >= *size {
+									*memory_usage += *size as usize;
+									drop(memory_usage);
+
+									cur_offset += *size;
+
+									let mut buf = Vec::with_capacity(*size as usize);
+									f.read_to_end(&mut buf).map(|_| buf)
+								} else {
+									let will_read = available_memory.min(max_offset - cur_offset);
+
+									*memory_usage += will_read as usize;
+									drop(memory_usage);
+
+									cur_offset += will_read;
+
+									let mut buf = Vec::with_capacity(will_read as usize);
+									(&mut f).take(will_read).read_to_end(&mut buf).map(|_| buf)
+								}
+							};
+
+							if tx.send(res.map(|contents| (cur_offset, contents))).is_err() {
+								return;
+							}
 						}
 					}
+				}).is_err() {
+					break;
 				}
-			}).is_err() {
-				break;
 			}
-		}
-		drop(tx);
+			drop(tx);
 
-		let contents_ptr = w.stream_position()?;
-		while let Ok(res) = rx.recv() {
-			let (offset, contents) = res?;
+			while let Ok(res) = rx.recv() {
+				let (offset, contents) = res?;
 
-			w.seek(SeekFrom::Start(contents_ptr + offset))?;
-			w.write_all(&contents)?;
+				w.seek(SeekFrom::Start(contents_ptr + offset))?;
+				w.write_all(&contents)?;
 
-			let contents_size = contents.len();
-			drop(contents);
-			*queue.memory_usage.lock().unwrap() -= contents_size;
-			queue.memory_usage_cvar.notify_all();
-		}
+				let contents_size = contents.len();
+				drop(contents);
+				*queue.memory_usage.lock().unwrap() -= contents_size;
+				queue.memory_usage_cvar.notify_all();
+			}
+
+			Ok::<_, anyhow::Error>(())
+		})?;
 
 		for GmaFileEntry { path, offset, .. } in full_copy_entries.iter() {
 			w.seek(SeekFrom::Start(contents_ptr + *offset))?;
@@ -257,6 +262,6 @@ pub fn create_gma_with_done_callback(
 	Ok(())
 }
 
-pub fn create_gma(conf: &'static CreateGmadConfig, w: &mut (impl Write + Seek)) -> Result<(), anyhow::Error> {
+pub fn create_gma(conf: &CreateGmadConfig, w: &mut (impl Write + Seek)) -> Result<(), anyhow::Error> {
 	create_gma_with_done_callback(conf, w, &mut || ())
 }

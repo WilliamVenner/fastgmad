@@ -10,10 +10,11 @@ Usage:
 );
 
 use fastgmad::{
-	create::conf::{CreateGmadConfig, CreateGmadOut},
+	create::{CreateGmadConfig, CreateGmadOut},
+	extract::{ExtractGmadConfig, ExtractGmadIn},
 	PrintHelp,
 };
-use std::{fs::File, time::Instant};
+use std::{fs::File, io::BufReader, time::Instant};
 
 enum FastGmadBinError {
 	PrintHelp(Option<&'static str>),
@@ -48,30 +49,50 @@ fn bin() -> Result<(), FastGmadBinError> {
 	match cmd.as_str() {
 		"create" => {
 			let (conf, out) = CreateGmadConfig::from_args()?;
-			let conf = &*Box::leak(Box::new(conf));
 			match out {
 				CreateGmadOut::File(path) => {
 					let mut w = File::create(path)?;
 					if conf.max_io_threads.get() == 1 {
-						fastgmad::create::standard::create_gma_with_done_callback(conf, &mut w, &mut exit)?;
+						fastgmad::create::standard::create_gma_with_done_callback(&conf, &mut w, &mut exit)?;
 					} else {
-						fastgmad::create::parallel::create_gma_with_done_callback(conf, &mut w, &mut exit)?;
+						fastgmad::create::parallel::create_gma_with_done_callback(&conf, &mut w, &mut exit)?;
 					}
 				}
 
 				CreateGmadOut::Stdout => {
 					let mut w = std::io::stdout().lock();
 					if conf.max_io_threads.get() == 1 {
-						fastgmad::create::standard::create_gma_with_done_callback(conf, &mut w, &mut exit)?;
+						fastgmad::create::standard::create_gma_with_done_callback(&conf, &mut w, &mut exit)?;
 					} else {
 						todo!();
-						// fastgmad::create::parallel::create_gma_with_done_callback(conf, &mut $w, exit)?;
+						// fastgmad::create::parallel::create_gma_with_done_callback(&conf, &mut w, &mut exit)?;
 					}
 				}
 			}
 		}
 
-		"extract" => {}
+		"extract" => {
+			let (conf, r#in) = ExtractGmadConfig::from_args()?;
+			match r#in {
+				ExtractGmadIn::File(path) => {
+					let mut r = BufReader::new(File::open(path)?);
+					if conf.max_io_threads.get() == 1 {
+						fastgmad::extract::standard::extract_gma_with_done_callback(&conf, &mut r, &mut exit)?;
+					} else {
+						fastgmad::extract::parallel::extract_gma_with_done_callback(&conf, &mut r, &mut exit)?;
+					}
+				}
+
+				ExtractGmadIn::Stdin => {
+					let mut r = std::io::stdin().lock();
+					if conf.max_io_threads.get() == 1 {
+						fastgmad::extract::standard::extract_gma_with_done_callback(&conf, &mut r, &mut exit)?;
+					} else {
+						fastgmad::extract::parallel::extract_gma_with_done_callback(&conf, &mut r, &mut exit)?;
+					}
+				}
+			}
+		}
 
 		_ => return Err(FastGmadBinError::PrintHelp(None)),
 	}

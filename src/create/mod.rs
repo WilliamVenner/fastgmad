@@ -2,7 +2,9 @@ use std::path::Path;
 
 pub mod parallel;
 pub mod standard;
-pub mod conf;
+
+mod conf;
+pub use conf::{CreateGmadConfig, CreateGmadOut};
 
 #[derive(serde::Deserialize)]
 struct AddonJson {

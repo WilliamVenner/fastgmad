@@ -379,8 +379,10 @@ name = "fastgmad"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "byteorder",
  "criterion",
  "lazy_static",
+ "memchr",
  "serde",
  "serde_json",
  "sysreq",

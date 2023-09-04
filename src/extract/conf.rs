@@ -10,28 +10,24 @@ macro_rules! nonzero {
 	};
 }
 
-pub enum CreateGmadOut {
-	Stdout,
+pub enum ExtractGmadIn {
+	Stdin,
 	File(PathBuf),
 }
 
 #[derive(Debug)]
-pub struct CreateGmadConfig {
-	pub folder: PathBuf,
-	pub warn_invalid: bool,
+pub struct ExtractGmadConfig {
+	pub out: PathBuf,
 	pub max_io_threads: NonZeroUsize,
 	pub max_io_memory_usage: NonZeroUsize,
 }
-impl CreateGmadConfig {
-	pub fn from_args() -> Result<(Self, CreateGmadOut), PrintHelp> {
+impl ExtractGmadConfig {
+	pub fn from_args() -> Result<(Self, ExtractGmadIn), PrintHelp> {
 		let mut config = Self::default();
-		let mut out = None;
+		let mut r#in = None;
 		let mut args = std::env::args_os().skip(2);
 		while let Some(arg) = args.next() {
-			match arg.to_str().ok_or(PrintHelp(Some("Unknown GMAD creation argument")))? {
-				"-warninvalid" => {
-					config.warn_invalid = true;
-				}
+			match arg.to_str().ok_or(PrintHelp(Some("Unknown argument")))? {
 				"-max-io-threads" => {
 					config.max_io_threads = args
 						.next()
@@ -49,27 +45,26 @@ impl CreateGmadConfig {
 						.ok_or(PrintHelp(Some("Expected integer greater than zero for -max-io-memory-usage")))?;
 				}
 				"-out" => {
-					out = Some(CreateGmadOut::File(PathBuf::from(
+					config.out = PathBuf::from(
 						args.next().ok_or(PrintHelp(Some("Expected a value after -out")))?,
-					)));
+					);
 				}
-				"-stdout" => {
-					out = Some(CreateGmadOut::Stdout);
+				"-stdin" => {
+					r#in = Some(ExtractGmadIn::Stdin);
 				}
-				"-folder" => {
-					config.folder = args.next().map(PathBuf::from).ok_or(PrintHelp(Some("Expected a value after -folder")))?;
+				"-file" => {
+					r#in = Some(ExtractGmadIn::File(args.next().map(PathBuf::from).ok_or(PrintHelp(Some("Expected a value after -folder")))?));
 				}
-				_ => return Err(PrintHelp(Some("Unknown GMAD creation argument"))),
+				_ => return Err(PrintHelp(Some("Unknown argument"))),
 			}
 		}
-		Ok((config, out.ok_or(PrintHelp(Some("Please provide an output path for GMAD creation")))?))
+		Ok((config, r#in.ok_or(PrintHelp(Some("Please provide an output path")))?))
 	}
 }
-impl Default for CreateGmadConfig {
+impl Default for ExtractGmadConfig {
 	fn default() -> Self {
 		Self {
-			folder: PathBuf::new(),
-			warn_invalid: false,
+			out: PathBuf::new(),
 			max_io_threads: std::thread::available_parallelism().unwrap_or_else(|_| nonzero!(NonZeroUsize::new(1))),
 			max_io_memory_usage: nonzero!(NonZeroUsize::new(2147483648)), // 2 GiB
 		}

@@ -12,7 +12,7 @@ struct GmaFileEntry {
 	size: u64,
 }
 
-pub fn create_gma_with_done_callback(conf: &'static CreateGmadConfig, w: &mut impl Write, done_callback: &mut dyn FnMut()) -> Result<(), anyhow::Error> {
+pub fn create_gma_with_done_callback(conf: &CreateGmadConfig, w: &mut impl Write, done_callback: &mut dyn FnMut()) -> Result<(), anyhow::Error> {
 	let addon_json = perf!(["addon.json"] => AddonJson::read(&conf.folder.join("addon.json"))?);
 
 	let entries = perf!(["entry discovery"] => {
@@ -134,6 +134,6 @@ pub fn create_gma_with_done_callback(conf: &'static CreateGmadConfig, w: &mut im
 	Ok(())
 }
 
-pub fn create_gma(conf: &'static CreateGmadConfig, w: &mut impl Write) -> Result<(), anyhow::Error> {
+pub fn create_gma(conf: &CreateGmadConfig, w: &mut impl Write) -> Result<(), anyhow::Error> {
 	create_gma_with_done_callback(conf, w, &mut || ())
 }

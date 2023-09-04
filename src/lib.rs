@@ -5,9 +5,7 @@ const GMA_VERSION: u8 = 3;
 mod util;
 
 #[cfg(test)]
-mod tests {
-	mod create_gma;
-}
+mod tests;
 
 pub mod create;
 pub mod extract;
@@ -15,3 +13,6 @@ pub mod publish;
 pub mod whitelist;
 
 pub use util::PrintHelp;
+
+// TODO crc
+// TODO error struct with file path context and stuff
