@@ -1,11 +1,9 @@
-use super::AddonJson;
-use crate::util::WriteEx;
-use crate::whitelist;
-use rayon::prelude::*;
+use crate::{create::conf::CreateGmadConfig, create::AddonJson, util::WriteEx, whitelist};
 use std::{
-	io::{Seek, SeekFrom, Write},
+	fs::File,
+	io::{Read, Seek, SeekFrom, Write, BufReader},
 	path::{Path, PathBuf},
-	sync::Arc,
+	sync::{atomic::AtomicUsize, Arc, Condvar, Mutex},
 	time::SystemTime,
 };
 
@@ -32,7 +30,12 @@ impl PartialEq for GmaFileEntry {
 	}
 }
 
-pub fn create_gma_with_done_callback(dir: &str, w: &mut (impl Write + Seek), done_callback: fn()) -> Result<(), std::io::Error> {
+pub fn create_gma_with_done_callback(
+	conf: &'static CreateGmadConfig,
+	dir: &str,
+	w: &mut (impl Write + Seek),
+	done_callback: fn(),
+) -> Result<(), std::io::Error> {
 	let addon_json = perf!(["addon.json"] => AddonJson::read(&Path::new(dir).join("addon.json"))?);
 
 	let entries = perf!(["entry discovery"] => {
@@ -61,6 +64,10 @@ pub fn create_gma_with_done_callback(dir: &str, w: &mut (impl Write + Seek), don
 			}
 
 			if !whitelist::check(&relative_path) {
+				if conf.warn_invalid {
+					println!("Warning: File {} not in GMA whitelist - see https://wiki.facepunch.com/gmod/Workshop_Addon_Creation", relative_path);
+					continue;
+				} else {
 				return Err(std::io::Error::new(
 					std::io::ErrorKind::InvalidData,
 					format!(
@@ -68,6 +75,7 @@ pub fn create_gma_with_done_callback(dir: &str, w: &mut (impl Write + Seek), don
 						relative_path
 					),
 				));
+			}
 			}
 
 			let size = entry.metadata()?.len();
@@ -140,37 +148,116 @@ pub fn create_gma_with_done_callback(dir: &str, w: &mut (impl Write + Seek), don
 
 	// Write entries
 	// TODO memory limiting
-	let entries = Arc::new(entries);
-	let entries_ref = entries.clone();
-	perf!(["write entries"] => {
-		rayon::spawn(move || {
-			entries_ref.par_iter().for_each_init(
-				|| tx.clone(),
-				|tx, GmaFileEntry { offset, path, .. }| {
-					tx.send((*offset, std::fs::read(path))).ok();
-				},
-			);
+	let queue = perf!(["write entries"] => {
+		const IO_THREAD_STACK_SIZE: usize = 2048;
+
+		struct EntriesQueue {
+			head: AtomicUsize,
+			entries: Vec<GmaFileEntry>,
+			memory_usage: Mutex<usize>,
+			memory_usage_cvar: Condvar,
+		}
+		impl EntriesQueue {
+			pub fn next(&self) -> Option<&GmaFileEntry> {
+				// NOTE: technically this can wrap around on overflow, but it won't happen because
+				// we only spawn a maximum of MAX_IO_THREADS.
+				self.entries.get(self.head.fetch_add(1, std::sync::atomic::Ordering::SeqCst))
+			}
+		}
+
+		// Split the entries into entries that we can buffer (size <= max_io_memory_usage)
+		// and entries that will be copied in full without buffering (size > max_io_memory_usage)
+		let (buffered_entries, full_copy_entries) = entries.into_iter().partition::<Vec<_>, _>(|entry| {
+			entry.size <= conf.max_io_memory_usage.get() as u64
 		});
 
+		let queue = Arc::new(EntriesQueue { entries: buffered_entries, head: AtomicUsize::new(0), memory_usage: Mutex::new(0), memory_usage_cvar: Condvar::new() });
+		for _ in 0..queue.entries.len().min(conf.max_io_threads.get()) {
+			let queue = queue.clone();
+			let tx = tx.clone();
+			if std::thread::Builder::new().stack_size(IO_THREAD_STACK_SIZE).spawn(move || {
+				while let Some(GmaFileEntry { offset, path, size, .. }) = queue.next() {
+					let mut cur_offset = *offset;
+					let max_offset = *offset + size;
+
+					let mut f = match File::open(path) {
+						Ok(f) => f,
+						Err(err) => {
+							tx.send(Err(err)).ok();
+							return;
+						}
+					};
+
+					while cur_offset < max_offset {
+						let mut memory_usage = queue.memory_usage_cvar.wait_while(queue.memory_usage.lock().unwrap(), |memory_usage| *memory_usage > 0 && *memory_usage + *size as usize >= conf.max_io_memory_usage.get()).unwrap();
+
+						let res = {
+							let available_memory = (conf.max_io_memory_usage.get() - *memory_usage) as u64;
+							if available_memory >= *size {
+								*memory_usage += *size as usize;
+								drop(memory_usage);
+
+								cur_offset += *size;
+
+								let mut buf = Vec::with_capacity(*size as usize);
+								f.read_to_end(&mut buf).map(|_| buf)
+							} else {
+								let will_read = available_memory.min(max_offset - cur_offset);
+
+								*memory_usage += will_read as usize;
+								drop(memory_usage);
+
+								cur_offset += will_read;
+
+								let mut buf = Vec::with_capacity(will_read as usize);
+								(&mut f).take(will_read).read_to_end(&mut buf).map(|_| buf)
+							}
+						};
+
+						if tx.send(res.map(|contents| (cur_offset, contents))).is_err() {
+							return;
+						}
+					}
+				}
+			}).is_err() {
+				break;
+			}
+		}
+		drop(tx);
+
 		let contents_ptr = w.stream_position()?;
-		while let Ok((offset, contents)) = rx.recv() {
-			let contents = contents?;
+		while let Ok(res) = rx.recv() {
+			let (offset, contents) = res?;
+
 			w.seek(SeekFrom::Start(contents_ptr + offset))?;
 			w.write_all(&contents)?;
+
+			let contents_size = contents.len();
+			drop(contents);
+			*queue.memory_usage.lock().unwrap() -= contents_size;
+			queue.memory_usage_cvar.notify_all();
 		}
+
+		for GmaFileEntry { path, offset, .. } in full_copy_entries.iter() {
+			w.seek(SeekFrom::Start(contents_ptr + *offset))?;
+			std::io::copy(&mut BufReader::new(File::open(path)?), w)?;
+		}
+
 		w.flush()?;
+
+		(full_copy_entries, queue)
 	});
 
 	// Explicitly free memory here
 	// We may exit the process in done_callback (thereby allowing the OS to free the memory),
 	// so make sure the optimiser knows to free all the memory here.
 	done_callback();
-	drop(entries);
+	drop(queue);
 	drop(addon_json);
 
 	Ok(())
 }
 
-pub fn create_gma(dir: &str, w: &mut (impl Write + Seek)) -> Result<(), std::io::Error> {
-	create_gma_with_done_callback(dir, w, || ())
+pub fn create_gma(conf: &'static CreateGmadConfig, dir: &str, w: &mut (impl Write + Seek)) -> Result<(), std::io::Error> {
+	create_gma_with_done_callback(conf, dir, w, || ())
 }

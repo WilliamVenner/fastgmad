@@ -30,3 +30,5 @@ macro_rules! perf {
 macro_rules! perf {
 	([$name:literal] => $code:expr) => {$code};
 }
+
+pub struct PrintHelp;

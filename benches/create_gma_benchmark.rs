@@ -32,12 +32,12 @@ fn criterion_benchmark(c: &mut Criterion) {
 		group.sampling_mode(criterion::SamplingMode::Flat);
 		group.bench_function("Standard", |b| {
 			b.iter(|| {
-				fastgmad::create::standard::create_gma(addon_dir, &mut temp_file()).unwrap();
+				fastgmad::create::standard::create_gma(fastgmad::create::conf::CreateGmadConfig::DEFAULT, addon_dir, &mut temp_file()).unwrap();
 			});
 		});
 		group.bench_function("Parallel", |b| {
 			b.iter(|| {
-				fastgmad::create::parallel::create_gma(addon_dir, &mut temp_file()).unwrap();
+				fastgmad::create::parallel::create_gma(fastgmad::create::conf::CreateGmadConfig::DEFAULT, addon_dir, &mut temp_file()).unwrap();
 			});
 		});
 		group.bench_function("GMAD", |b| {

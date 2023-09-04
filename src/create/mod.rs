@@ -2,6 +2,7 @@ use std::path::Path;
 
 pub mod parallel;
 pub mod standard;
+pub mod conf;
 
 #[derive(serde::Deserialize)]
 struct AddonJson {
