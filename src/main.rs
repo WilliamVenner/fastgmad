@@ -18,6 +18,19 @@ fastgmad extract -file path/to/gma.gma -out path/to/folder
 fastgmad extract -file path/to/gma.gma
 fastgmad extract -stdin -out path/to/folder
 
+Publishing GMAs
+---------------
+>> Adding an icon is OPTIONAL for publishing a new Workshop addon. A default icon will be provided for you if you don't add one.
+Accepted Icon Formats: JPG, PNG, GIF
+Icon Max Size: 1 MB
+Recommended Icon Dimensions: 512x512
+
+fastgmad publish -addon path/to/gma.gma -icon path/to/icon
+fastgmad update -id 1337 -addon path/to/gma.gma
+fastgmad update -id 1337 -addon path/to/gma.gma -icon path/to/icon
+fastgmad update -id 1337 -addon path/to/gma.gma -changes "fixed something"
+fastgmad update -id 1337 -addon path/to/gma.gma -changes "fixed something" -icon path/to/icon
+
 Additional flags
 ----------------
 -max-io-threads <integer> - The maximum number of threads to use for reading and writing files. Defaults to the number of logical cores on the system.
@@ -33,6 +46,7 @@ Notes
 use fastgmad::{
 	create::{CreateGmadConfig, CreateGmadOut},
 	extract::{ExtractGmadConfig, ExtractGmadIn},
+	workshop::{WorkshopPublishConfig, WorkshopUpdateConfig},
 	PrintHelp,
 };
 use std::{
@@ -47,7 +61,8 @@ fn main() {
 	eprintln!(concat!(
 		"fastgmad v",
 		env!("CARGO_PKG_VERSION"),
-		" by Billy\nhttps://github.com/WilliamVenner/fastgmad\n"
+		" by Billy\nhttps://github.com/WilliamVenner/fastgmad\n",
+		"Prefer to use a GUI? Check out https://github.com/WilliamVenner/gmpublisher\n"
 	));
 	match bin() {
 		Ok(()) => {}
@@ -114,6 +129,10 @@ fn bin() -> Result<(), FastGmadBinError> {
 				extract(conf, r#in, &mut exit)
 			}
 
+			Some("publish") => publish(WorkshopPublishConfig::from_args()?),
+
+			Some("update") => update(WorkshopUpdateConfig::from_args()?),
+
 			_ => Err(FastGmadBinError::PrintHelp(None)),
 		}
 	}
@@ -162,6 +181,20 @@ fn extract(conf: ExtractGmadConfig, r#in: ExtractGmadIn, exit: &mut impl FnMut()
 			}
 		}
 	}
+	Ok(())
+}
+
+fn publish(conf: WorkshopPublishConfig) -> Result<(), FastGmadBinError> {
+	let id = fastgmad::workshop::publish_gma(&conf)?;
+	println!("{}", id.0);
+	eprintln!("\nPublished to https://steamcommunity.com/sharedfiles/filedetails/?id={}", id.0);
+	Ok(())
+}
+
+fn update(conf: WorkshopUpdateConfig) -> Result<(), FastGmadBinError> {
+	fastgmad::workshop::update_gma(&conf)?;
+	println!("{}", conf.id);
+	eprintln!("\nUpdated https://steamcommunity.com/sharedfiles/filedetails/?id={}", conf.id);
 	Ok(())
 }
 

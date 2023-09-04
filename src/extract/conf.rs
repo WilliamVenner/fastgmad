@@ -27,7 +27,7 @@ impl ExtractGmadConfig {
 		let mut r#in = None;
 		let mut args = std::env::args_os().skip(2);
 		while let Some(arg) = args.next() {
-			match arg.to_str().ok_or(PrintHelp(Some("Unknown argument")))? {
+			match arg.to_str().ok_or(PrintHelp(Some("Unknown GMAD extraction argument")))? {
 				"-max-io-threads" => {
 					config.max_io_threads = args
 						.next()
@@ -45,17 +45,24 @@ impl ExtractGmadConfig {
 						.ok_or(PrintHelp(Some("Expected integer greater than zero for -max-io-memory-usage")))?;
 				}
 				"-out" => {
-					config.out = PathBuf::from(args.next().ok_or(PrintHelp(Some("Expected a value after -out")))?);
+					config.out = PathBuf::from(
+						args.next()
+							.filter(|out| !out.is_empty())
+							.ok_or(PrintHelp(Some("Expected a value after -out")))?,
+					);
 				}
 				"-stdin" => {
 					r#in = Some(ExtractGmadIn::Stdin);
 				}
 				"-file" => {
 					r#in = Some(ExtractGmadIn::File(
-						args.next().map(PathBuf::from).ok_or(PrintHelp(Some("Expected a value after -folder")))?,
+						args.next()
+							.filter(|r#in| !r#in.is_empty())
+							.map(PathBuf::from)
+							.ok_or(PrintHelp(Some("Expected a value after -folder")))?,
 					));
 				}
-				_ => return Err(PrintHelp(Some("Unknown argument"))),
+				_ => return Err(PrintHelp(Some("Unknown GMAD extraction argument"))),
 			}
 		}
 		Ok((config, r#in.ok_or(PrintHelp(Some("Please provide an output path")))?))

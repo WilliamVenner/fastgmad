@@ -50,14 +50,20 @@ impl CreateGmadConfig {
 				}
 				"-out" => {
 					out = Some(CreateGmadOut::File(PathBuf::from(
-						args.next().ok_or(PrintHelp(Some("Expected a value after -out")))?,
+						args.next()
+							.filter(|out| !out.is_empty())
+							.ok_or(PrintHelp(Some("Expected a value after -out")))?,
 					)));
 				}
 				"-stdout" => {
 					out = Some(CreateGmadOut::Stdout);
 				}
 				"-folder" => {
-					config.folder = args.next().map(PathBuf::from).ok_or(PrintHelp(Some("Expected a value after -folder")))?;
+					config.folder = args
+						.next()
+						.filter(|folder| !folder.is_empty())
+						.map(PathBuf::from)
+						.ok_or(PrintHelp(Some("Expected a value after -folder")))?;
 				}
 				_ => return Err(PrintHelp(Some("Unknown GMAD creation argument"))),
 			}

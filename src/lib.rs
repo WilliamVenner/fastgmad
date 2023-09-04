@@ -9,8 +9,10 @@ mod tests;
 
 pub mod create;
 pub mod extract;
-pub mod publish;
 pub mod whitelist;
+
+#[cfg(feature = "workshop")]
+pub mod workshop;
 
 pub use util::PrintHelp;
 
