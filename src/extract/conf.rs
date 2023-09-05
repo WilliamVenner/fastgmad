@@ -9,10 +9,16 @@ macro_rules! nonzero {
 	};
 }
 
+/// Options for .GMA extraction
 #[derive(Debug)]
 pub struct ExtractGmaConfig {
+	/// The folder to extract the .GMA to
 	pub out: PathBuf,
+
+	/// The maximum number of threads to use for I/O
 	pub max_io_threads: NonZeroUsize,
+
+	/// The maximum amount of memory to use for I/O
 	pub max_io_memory_usage: NonZeroUsize,
 
 	#[cfg(feature = "binary")]

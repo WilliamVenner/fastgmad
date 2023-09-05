@@ -14,10 +14,16 @@ pub use conf::ExtractGmaConfig;
 #[cfg(feature = "binary")]
 pub use conf::ExtractGmadIn;
 
+/// Extracts a GMA file to a directory.
 pub fn extract_gma(conf: &ExtractGmaConfig, r: &mut impl BufRead) -> Result<(), anyhow::Error> {
-	extract_gma_with_done_callback(conf, r, &mut || ())
+	if conf.max_io_threads.get() == 1 {
+		StandardExtractGma::extract_gma_with_done_callback(conf, r, &mut || ())
+	} else {
+		ParallelExtractGma::extract_gma_with_done_callback(conf, r, &mut || ())
+	}
 }
 
+#[cfg(feature = "binary")]
 pub fn extract_gma_with_done_callback(conf: &ExtractGmaConfig, r: &mut impl BufRead, done_callback: &mut dyn FnMut()) -> Result<(), anyhow::Error> {
 	if conf.max_io_threads.get() == 1 {
 		StandardExtractGma::extract_gma_with_done_callback(conf, r, done_callback)

@@ -63,7 +63,7 @@ const ADDON_WHITELIST: &[&str] = &[
 const WILD_BYTE: u8 = b'*';
 const QUESTION_BYTE: u8 = b'?';
 
-pub fn globber(wild: &str, str: &str) -> bool {
+fn globber(wild: &str, str: &str) -> bool {
 	unsafe {
 		let mut cp: *const u8 = core::ptr::null();
 		let mut mp: *const u8 = core::ptr::null();
@@ -105,6 +105,7 @@ pub fn globber(wild: &str, str: &str) -> bool {
 	}
 }
 
+/// Check if a path is allowed in a GMA file
 pub fn check(str: &str) -> bool {
 	for glob in ADDON_WHITELIST {
 		if globber(glob, str) {
@@ -115,6 +116,7 @@ pub fn check(str: &str) -> bool {
 	false
 }
 
+/// Check if a path is ignored by a list of custom globs
 pub fn is_ignored(str: &str, ignore: &[String]) -> bool {
 	if ignore.is_empty() {
 		return false;

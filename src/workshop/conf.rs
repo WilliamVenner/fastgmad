@@ -50,9 +50,18 @@ impl WorkshopPublishConfig {
 }
 
 pub struct WorkshopUpdateConfig {
+	/// The Workshop ID of the addon to update
 	pub id: u64,
+
+	/// Path to the addon .GMA file
 	pub addon: PathBuf,
+
+	/// Path to the addon icon file
+	///
+	/// If `None`, the addon's icon will not be updated
 	pub icon: Option<PathBuf>,
+
+	/// Changelog
 	pub changes: Option<String>,
 
 	#[cfg(feature = "binary")]

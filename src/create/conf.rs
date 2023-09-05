@@ -9,11 +9,19 @@ macro_rules! nonzero {
 	};
 }
 
+/// Options for .GMA creation
 #[derive(Debug)]
 pub struct CreateGmaConfig {
+	/// The folder to create a .GMA from
 	pub folder: PathBuf,
+
+	/// Whether to warn about invalid files or to throw an error
 	pub warn_invalid: bool,
+
+	/// The maximum number of threads to use for I/O
 	pub max_io_threads: NonZeroUsize,
+
+	/// The maximum amount of memory to use for I/O
 	pub max_io_memory_usage: NonZeroUsize,
 
 	#[cfg(feature = "binary")]

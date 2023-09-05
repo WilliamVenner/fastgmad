@@ -181,10 +181,12 @@ fn workshop_upload(kind: PublishKind, addon: &Path, icon: Option<&Path>) -> Resu
 	})
 }
 
+/// Publishes a GMA to the Steam Workshop
 pub fn publish_gma(conf: &WorkshopPublishConfig) -> Result<PublishedFileId, anyhow::Error> {
 	workshop_upload(PublishKind::Create, &conf.addon, conf.icon.as_deref())
 }
 
+/// Updates a GMA on the Steam Workshop
 pub fn update_gma(conf: &WorkshopUpdateConfig) -> Result<(), anyhow::Error> {
 	workshop_upload(
 		PublishKind::Update {

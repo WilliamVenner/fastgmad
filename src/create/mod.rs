@@ -15,25 +15,37 @@ pub use conf::CreateGmaConfig;
 #[cfg(feature = "binary")]
 pub use conf::CreateGmadOut;
 
+/// Creates a GMA file from a directory.
+///
+/// Prefer [`seekable_create_gma`] if your writer type implements [`std::io::Seek`], as it supports parallel I/O.
 pub fn create_gma(conf: &CreateGmaConfig, w: &mut impl Write) -> Result<(), anyhow::Error> {
-	create_gma_with_done_callback(conf, w, &mut || ())
+	StandardCreateGma::create_gma_with_done_callback(w, conf, &mut || ())
 }
 
+/// Creates a GMA file from a directory.
+///
+/// Prefer this function over [`create_gma`] if your writer type implements [`std::io::Seek`], as this function supports parallel I/O.
 pub fn seekable_create_gma(conf: &CreateGmaConfig, w: &mut (impl Write + Seek)) -> Result<(), anyhow::Error> {
-	seekable_create_gma_with_done_callback(conf, w, &mut || ())
+	if conf.max_io_threads.get() == 1 {
+		StandardCreateGma::create_gma_with_done_callback(w, conf, &mut || ())
+	} else {
+		ParallelCreateGma::create_gma_with_done_callback(w, conf, &mut || ())
+	}
 }
 
+#[cfg(feature = "binary")]
 pub fn create_gma_with_done_callback(conf: &CreateGmaConfig, w: &mut impl Write, done_callback: &mut dyn FnMut()) -> Result<(), anyhow::Error> {
 	StandardCreateGma::create_gma_with_done_callback(w, conf, done_callback)
 }
 
+#[cfg(feature = "binary")]
 pub fn seekable_create_gma_with_done_callback(
 	conf: &CreateGmaConfig,
 	w: &mut (impl Write + Seek),
 	done_callback: &mut dyn FnMut(),
 ) -> Result<(), anyhow::Error> {
 	if conf.max_io_threads.get() == 1 {
-		create_gma_with_done_callback(conf, w, done_callback)
+		StandardCreateGma::create_gma_with_done_callback(w, conf, done_callback)
 	} else {
 		ParallelCreateGma::create_gma_with_done_callback(w, conf, done_callback)
 	}
