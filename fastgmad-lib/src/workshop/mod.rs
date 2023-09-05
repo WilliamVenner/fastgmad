@@ -213,7 +213,7 @@ fn workshop_upload(#[cfg(feature = "binary")] noprogress: bool, kind: PublishKin
 	};
 
 	let res = (|| {
-		log::info!("Preparing item upload...");
+		log::info!("Preparing item {file_id} upload...");
 
 		// Add "Addon" and the addon type to the tags
 		let tags = {
