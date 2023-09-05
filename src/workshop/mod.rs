@@ -163,7 +163,14 @@ impl ContentPath {
 		let symlink_result = {
 			#[cfg(windows)]
 			{
-				std::os::windows::fs::symlink_file(&temp_gma_path, gma_path)
+				let res = std::os::windows::fs::symlink_file(&temp_gma_path, gma_path);
+				match &res {
+					Err(res) if res.kind() == std::io::ErrorKind::PermissionDenied => {
+						eprintln!("warning: copying .gma to temporary directory for publishing. To skip this in future, run as administrator so that fastgmad can create symlinks.");
+					}
+					_ => {}
+				}
+				res
 			}
 			#[cfg(unix)]
 			{

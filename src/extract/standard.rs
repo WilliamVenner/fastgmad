@@ -94,7 +94,7 @@ pub fn extract_gma_with_done_callback(
 		}
 
 		let mut take = r.take(*size);
-		let mut w = BufWriter::new(File::create(path)?);
+		let mut w = File::create(path)?;
 		std::io::copy(&mut take, &mut w)?;
 		w.flush()?;
 		r = take.into_inner();

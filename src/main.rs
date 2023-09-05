@@ -52,7 +52,7 @@ use fastgmad::{
 use std::{
 	ffi::OsStr,
 	fs::File,
-	io::BufReader,
+	io::{BufReader, BufWriter},
 	path::{Path, PathBuf},
 	time::Instant,
 };
@@ -141,7 +141,7 @@ fn bin() -> Result<(), FastGmadBinError> {
 fn create(conf: CreateGmadConfig, out: CreateGmadOut, exit: &mut impl FnMut()) -> Result<(), FastGmadBinError> {
 	match out {
 		CreateGmadOut::File(path) => {
-			let mut w = File::create(path)?;
+			let mut w = BufWriter::new(File::create(path)?);
 			if conf.max_io_threads.get() == 1 {
 				fastgmad::create::standard::create_gma_with_done_callback(&conf, &mut w, exit)?;
 			} else {

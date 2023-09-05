@@ -49,26 +49,4 @@ impl<R: BufRead> BufReadEx for R {
 	}
 }
 
-#[cfg(all(not(bench), not(debug_assertions), test))]
-#[allow(unused)]
-#[macro_export]
-macro_rules! perf {
-	([$name:literal] => $code:expr) => {{
-		let now = std::time::Instant::now();
-		let ret = $code;
-		let elapsed = now.elapsed();
-		println!(concat!('[', $name, "]: {:?}"), elapsed);
-		ret
-	}};
-}
-
-#[cfg(not(all(not(bench), not(debug_assertions), test)))]
-#[allow(unused)]
-#[macro_export]
-macro_rules! perf {
-	([$name:literal] => $code:expr) => {
-		$code
-	};
-}
-
 pub struct PrintHelp(pub Option<&'static str>);

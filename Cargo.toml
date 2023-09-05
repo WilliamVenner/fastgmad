@@ -8,6 +8,10 @@ description = "Fast gmad and gmpublisher implementation"
 repository = "https://github.com/WilliamVenner/fastgmad"
 publish = false
 
+[profile.release]
+lto = "thin"
+codegen-units = 1
+
 [features]
 default = ["workshop"]
 workshop = ["dep:steamworks"]
