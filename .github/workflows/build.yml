@@ -16,7 +16,7 @@ jobs:
     - name: Build binary
       run: cargo build --release --package fastgmad-bin --bin fastgmad
     - name: Build publishing library
-      run: cargo build --release --package fastgmad-publish
+      run: cargo build --release --package fastgmad-publish --features binary
     - name: Zip
       run: |
         7z a -tzip -mx=9 target/release/fastgmad_linux.zip ./target/release/fastgmad ./target/release/libfastgmad_publish.so ./steam_api_sdk/redistributable_bin/linux64/libsteam_api.so
@@ -35,7 +35,7 @@ jobs:
     - name: Build binary
       run: cargo build --release --package fastgmad-bin --bin fastgmad
     - name: Build publishing library
-      run: cargo build --release --package fastgmad-publish
+      run: cargo build --release --package fastgmad-publish --features binary
       env:
         RUSTFLAGS: -Ctarget-feature=+crt-static
     - name: Zip
@@ -56,7 +56,7 @@ jobs:
     - name: Build binary
       run: cargo build --release --package fastgmad-bin --bin fastgmad
     - name: Build publishing library
-      run: cargo build --release --package fastgmad-publish
+      run: cargo build --release --package fastgmad-publish --features binary
     - name: Zip
       run: |
         7z a -tzip -mx=9 target/release/fastgmad_macos.zip ./target/release/fastgmad ./target/release/libfastgmad_publish.dylib ./steam_api_sdk/redistributable_bin/osx/libsteam_api.dylib
