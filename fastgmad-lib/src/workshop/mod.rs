@@ -39,7 +39,7 @@ Once you have accepted the agreement, you can set the visiblity of your addon to
 #[cfg(feature = "binary")]
 fn init_steam() -> Result<Box<dyn PublishStateInterface>, anyhow::Error> {
 	unsafe {
-		let lib = Box::leak(Box::new(libloading::Library::new("fastgmad_publish")?));
+		let lib = Box::leak(Box::new(libloading::Library::new(if cfg!(windows) { "fastgmad_publish" } else { "libfastgmad_publish" })?));
 		let fastgmad_publish_init: fn() -> Result<*mut dyn PublishStateInterface, fastgmad_publish::shared::PublishError> = *lib.get(b"fastgmad_publish_init")?;
 		let interface = fastgmad_publish_init()?;
 		Ok(Box::from_raw(interface) as Box<dyn PublishStateInterface>)
