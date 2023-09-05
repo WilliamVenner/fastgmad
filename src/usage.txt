@@ -21,7 +21,7 @@ fastgmad extract -stdin -out path/to/folder
 
 Publishing GMAs
 ---------------
->> Adding an icon is OPTIONAL for publishing a new Workshop addon. A default icon will be provided for you if you don't add one.
+>> Adding an icon is OPTIONAL for publishing a new Workshop addon. A default icon will be provided for you if you don't add one. <<
 Accepted Icon Formats: JPG, PNG, GIF
 Icon Max Size: 1 MB
 Recommended Icon Dimensions: 512x512
