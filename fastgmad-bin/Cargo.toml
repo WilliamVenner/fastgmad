@@ -8,6 +8,10 @@ description = "Fast gmad and gmpublish implementation"
 repository = "https://github.com/WilliamVenner/fastgmad"
 publish = false
 
+[features]
+default = ["binary"]
+binary = []
+
 [[bin]]
 name = "fastgmad"
 path = "src/main.rs"

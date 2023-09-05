@@ -1,2 +1,7 @@
 [workspace]
 members = ["fastgmad-lib", "fastgmad-publish", "fastgmad-bin"]
+
+[profile.release]
+lto = "thin"
+codegen-units = 1
+strip = "debuginfo"
