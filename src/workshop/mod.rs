@@ -19,9 +19,9 @@ use steamworks::{Client, PublishedFileId, UpdateStatus};
 use uuid::Uuid;
 
 const LEGAL_AGREEMENT_MESSAGE: &str = r#"
-You must accept the Steam Workshop legal agreement before you can upload addons.
+You must accept the Steam Workshop legal agreement before you can make your addon public.
 You can do this at https://steamcommunity.com/sharedfiles/workshoplegalagreement
-Once you have accepted the agreement, you can upload addons.
+Once you have accepted the agreement, you can set the visiblity of your addon to public.
 "#;
 
 const WORKSHOP_DEFAULT_ICON: &[u8] = include_bytes!("gmpublisher_default_icon.png");
