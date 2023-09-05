@@ -13,11 +13,13 @@ jobs:
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v2
-    - name: Build
-      run: cargo build --release --all-features --bin fastgmad
+    - name: Build binary
+      run: cargo build --release --package fastgmad-bin --bin fastgmad
+    - name: Build publishing library
+      run: cargo build --release --package fastgmad-publish
     - name: Zip
       run: |
-        7z a -tzip -mx=9 target/release/fastgmad_linux.zip ./target/release/fastgmad ./steam_api_sdk/redistributable_bin/linux64/libsteam_api.so
+        7z a -tzip -mx=9 target/release/fastgmad_linux.zip ./target/release/fastgmad ./target/release/libfastgmad_publish.so ./steam_api_sdk/redistributable_bin/linux64/libsteam_api.so
     - name: Release
       uses: softprops/action-gh-release@v1
       with:
@@ -30,13 +32,15 @@ jobs:
     runs-on: windows-latest
     steps:
     - uses: actions/checkout@v2
-    - name: Build
-      run: cargo build --release --all-features --bin fastgmad
+    - name: Build binary
+      run: cargo build --release --package fastgmad-bin --bin fastgmad
+    - name: Build publishing library
+      run: cargo build --release --package fastgmad-publish
       env:
         RUSTFLAGS: -Ctarget-feature=+crt-static
     - name: Zip
       run: |
-        7z a -tzip -mx=9 target/release/fastgmad_windows.zip ./target/release/fastgmad.exe ./steam_api_sdk/redistributable_bin/win64/steam_api64.dll
+        7z a -tzip -mx=9 target/release/fastgmad_windows.zip ./target/release/fastgmad.exe ./target/release/fastgmad_publish.dll ./steam_api_sdk/redistributable_bin/win64/steam_api64.dll
     - name: Release
       uses: softprops/action-gh-release@v1
       with:
@@ -49,11 +53,13 @@ jobs:
     runs-on: macos-latest
     steps:
     - uses: actions/checkout@v2
-    - name: Build
-      run: cargo build --release --all-features --bin fastgmad
+    - name: Build binary
+      run: cargo build --release --package fastgmad-bin --bin fastgmad
+    - name: Build publishing library
+      run: cargo build --release --package fastgmad-publish
     - name: Zip
       run: |
-        7z a -tzip -mx=9 target/release/fastgmad_macos.zip ./target/release/fastgmad ./steam_api_sdk/redistributable_bin/osx/libsteam_api.dylib
+        7z a -tzip -mx=9 target/release/fastgmad_macos.zip ./target/release/fastgmad ./target/release/libfastgmad_publish.dylib ./steam_api_sdk/redistributable_bin/osx/libsteam_api.dylib
     - name: Release
       uses: softprops/action-gh-release@v1
       with:

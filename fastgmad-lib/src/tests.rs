@@ -167,11 +167,11 @@ fn verify_extracted_wiremod(dir: &Path, wiremod_test_data: &WiremodTestData) {
 		}
 
 		let relative_path = unpacked_entry.strip_prefix(&wiremod_test_data.addon_dir).unwrap();
-		let relative_path_str = relative_path.to_str().unwrap();
-		if fastgmad::whitelist::is_ignored(relative_path_str, &ignore) {
+		let relative_path_str = relative_path.to_str().unwrap().replace('\\', "/");
+		if fastgmad::whitelist::is_ignored(&relative_path_str, &ignore) {
 			continue;
 		}
-		assert!(fastgmad::whitelist::check(relative_path_str), "{:?} is not whitelisted", relative_path);
+		assert!(fastgmad::whitelist::check(&relative_path_str), "{:?} is not whitelisted", relative_path);
 
 		let packed_entry = dir.join(relative_path);
 

@@ -1,0 +1,14 @@
+[package]
+name = "fastgmad-publish"
+version = "0.1.0"
+edition = "2021"
+publish = false
+
+[lib]
+crate-type = ["cdylib"]
+
+[features]
+binary = []
+
+[dependencies]
+steamworks = "0.9"

@@ -2,7 +2,7 @@ use fastgmad::{
 	create::{CreateGmaConfig, CreateGmadOut},
 	extract::{ExtractGmaConfig, ExtractGmadIn},
 	workshop::{WorkshopPublishConfig, WorkshopUpdateConfig},
-	PrintHelp,
+	bin_prelude::*,
 };
 use std::{
 	ffi::OsStr,
@@ -55,6 +55,7 @@ fn main() {
 		Ok(()) => {}
 
 		Err(FastGmadBinError::Error(err)) => {
+			eprintln!();
 			log::error!("{err:#?}\n");
 			Err::<(), _>(err).unwrap();
 		}
@@ -65,6 +66,27 @@ fn main() {
 			}
 
 			eprintln!("{}", include_str!("usage.txt"));
+		}
+
+		Err(FastGmadBinError::Libloading(err)) => {
+			eprintln!();
+			log::error!("Error loading shared libraries for Workshop publishing: {err}");
+			if cfg!(target_os = "windows") {
+				log::error!("fastgmad comes with two additional DLLs: steam_api64.dll and fastgmad_publish.dll");
+				log::error!("Make sure these DLL files are present in the same directory as fastgmad, otherwise Workshop publishing will not work");
+			} else if cfg!(target_os = "linux") {
+				log::error!("fastgmad comes with two additional shared libraries: libsteam_api.so and libfastgmad_publish.so");
+				log::error!("Make sure these shared libraries are present in the same directory & dynamic linker search path as fastgmad, otherwise Workshop publishing will not work");
+			} else if cfg!(target_os = "macos") {
+				log::error!("fastgmad comes with two additional shared libraries: libsteam_api.dylib and libfastgmad_publish.dylib");
+				log::error!("Make sure these shared libraries are present in the same directory as fastgmad, otherwise Workshop publishing will not work");
+			} else {
+				log::error!("fastgmad comes with two additional shared libraries");
+				log::error!("Make sure these shared libraries are present in the same directory & dynamic linker search path as fastgmad, otherwise Workshop publishing will not work");
+			}
+			log::error!("Additionally, it is not recommended to install fastgmad in the bin directory of Garry's Mod, as Garry's Mod itself may use a different version of the Steam API and updates can break this");
+			eprintln!();
+			Err(err).unwrap()
 		}
 	}
 }
@@ -162,8 +184,8 @@ fn extract(conf: ExtractGmaConfig, r#in: ExtractGmadIn, exit: &mut impl FnMut())
 
 fn publish(conf: WorkshopPublishConfig) -> Result<(), FastGmadBinError> {
 	let id = fastgmad::workshop::publish_gma(&conf)?;
-	println!("{}", id.0);
-	log::info!("Published to https://steamcommunity.com/sharedfiles/filedetails/?id={}", id.0);
+	println!("{}", id);
+	log::info!("Published to https://steamcommunity.com/sharedfiles/filedetails/?id={}", id);
 	Ok(())
 }
 
@@ -181,10 +203,14 @@ fn update(conf: WorkshopUpdateConfig) -> Result<(), FastGmadBinError> {
 enum FastGmadBinError {
 	PrintHelp(Option<&'static str>),
 	Error(anyhow::Error),
+	Libloading(libloading::Error),
 }
 impl From<anyhow::Error> for FastGmadBinError {
 	fn from(e: anyhow::Error) -> Self {
-		Self::Error(e)
+		match e.downcast::<libloading::Error>() {
+			Ok(e) => Self::Libloading(e),
+			Err(e) => Self::Error(e),
+		}
 	}
 }
 impl From<std::io::Error> for FastGmadBinError {

@@ -4,7 +4,7 @@
 //!
 //! `workshop` - Workshop publishing support
 //!
-//! `binary` - This is a private internal feature flag for the binary target
+//! `binary` - Recommended if you're using fastgmad in a binary as this enables some binary-related helpers.
 
 #![cfg_attr(not(feature = "binary"), warn(missing_docs))]
 
@@ -31,6 +31,11 @@ pub mod whitelist;
 pub mod workshop;
 
 #[cfg(feature = "binary")]
-pub use util::PrintHelp;
+pub mod bin_prelude {
+	pub use crate::util::PrintHelp;
+	pub use libloading;
+	pub use anyhow;
+	pub use log;
+}
 
 // TODO error struct with file path context and stuff
