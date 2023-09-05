@@ -118,8 +118,10 @@ pub fn extract_gma_with_done_callback(
 
 	// File contents
 	{
+		log::info!("Extracting file contents...");
+
 		#[cfg(feature = "binary")]
-		let mut progress = crate::util::ProgressPrinter::new(total_size, "Extracting file contents...");
+		let mut progress = crate::util::ProgressPrinter::new(total_size);
 
 		for GmaEntry { path, size } in file_index.iter() {
 			if let Some(parent) = path.parent() {

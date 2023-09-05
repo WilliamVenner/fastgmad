@@ -115,8 +115,10 @@ pub fn extract_gma_with_done_callback(conf: &ExtractGmadConfig, r: &mut impl Buf
 
 	// File contents
 	{
+		log::info!("Extracting file contents...");
+
 		#[cfg(feature = "binary")]
-		let mut progress = crate::util::ProgressPrinter::new(total_size, "Extracting file contents...");
+		let mut progress = crate::util::ProgressPrinter::new(total_size);
 
 		let memory_used = AtomicUsize::new(0);
 		let error = Mutex::new(None);

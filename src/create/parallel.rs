@@ -138,8 +138,10 @@ pub fn create_gma_with_done_callback(
 
 	let (buffered_entries, full_copy_entries, queue);
 	{
+		log::info!("Writing file contents...");
+
 		#[cfg(feature = "binary")]
-		let mut progress = crate::util::ProgressPrinter::new(total_size, "Writing file contents...");
+		let mut progress = crate::util::ProgressPrinter::new(total_size);
 
 		let (tx, rx) = std::sync::mpsc::sync_channel(0);
 

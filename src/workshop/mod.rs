@@ -1,17 +1,21 @@
 mod conf;
 pub use conf::{WorkshopPublishConfig, WorkshopUpdateConfig};
 
-use crate::{util::BufReadEx, GMA_MAGIC, GMA_VERSION};
+use crate::{
+	util::{BufReadEx, ProgressPrinter},
+	GMA_MAGIC, GMA_VERSION,
+};
 use byteorder::ReadBytesExt;
 use std::{
 	borrow::Cow,
 	fs::File,
 	io::{BufReader, Read},
+	num::NonZeroU64,
 	path::Path,
 	path::PathBuf,
 	time::Duration,
 };
-use steamworks::{Client, PublishedFileId};
+use steamworks::{Client, PublishedFileId, UpdateStatus};
 use uuid::Uuid;
 
 const LEGAL_AGREEMENT_MESSAGE: &str = r#"
@@ -29,11 +33,7 @@ enum PublishKind<'a> {
 	Create,
 	Update { id: PublishedFileId, changes: Option<&'a str> },
 }
-fn workshop_upload(
-	kind: PublishKind,
-	addon: &Path,
-	icon: Option<&Path>,
-) -> Result<PublishedFileId, anyhow::Error> {
+fn workshop_upload(kind: PublishKind, addon: &Path, icon: Option<&Path>) -> Result<PublishedFileId, anyhow::Error> {
 	log::info!("Initializing Steam...");
 	let (client, single) = Client::init_app(4000)?;
 
@@ -68,7 +68,7 @@ fn workshop_upload(
 		PublishKind::Create => {
 			log::info!("Creating new Workshop item...");
 			run_steam_api!(callback => client.ugc().create_item(GMOD_APPID, steamworks::FileType::Community, callback))?
-		},
+		}
 		PublishKind::Update { id, .. } => (*id, false),
 	};
 
@@ -115,8 +115,49 @@ fn workshop_upload(
 		item_update = item_update.content_path(&content_path.0);
 
 		log::info!("Uploading item...");
-		legal_agreement_pending |=
-			run_steam_api!(callback => item_update.submit(changes, callback)).map(|(_id, legal_agreement_pending)| legal_agreement_pending)?;
+
+		let res = {
+			let mut status = None;
+			let mut total = None;
+			let mut progress_printer = None;
+
+			let (tx, rx) = std::sync::mpsc::sync_channel(1);
+			let update_handle = item_update.submit(changes, move |result| {
+				tx.send(result).ok();
+			});
+			loop {
+				match rx.recv_timeout(Duration::from_millis(50)) {
+					Ok(res) => break res,
+					Err(std::sync::mpsc::RecvTimeoutError::Disconnected) => {
+						return Err(steamworks::SteamError::RemoteDisconnect);
+					}
+					Err(std::sync::mpsc::RecvTimeoutError::Timeout) => {
+						let (new_status, new_progress, new_total) = update_handle.progress();
+
+						let new_total = NonZeroU64::new(new_total);
+						let did_total_change = core::mem::replace(&mut total, new_total) != new_total;
+
+						let new_status = if new_status != UpdateStatus::Invalid { Some(new_status) } else { None };
+						let did_status_change = core::mem::replace(&mut status, new_status) != new_status;
+
+						if did_status_change || did_total_change {
+							progress_printer = match (new_status, new_total) {
+								(Some(_), Some(new_total)) => Some(ProgressPrinter::new(new_total.get())),
+								_ => None,
+							};
+						}
+
+						if let Some(progress_printer) = &mut progress_printer {
+							progress_printer.set_progress(new_progress);
+						}
+
+						single.run_callbacks();
+					}
+				}
+			}
+		};
+
+		legal_agreement_pending |= res.map(|(_id, legal_agreement_pending)| legal_agreement_pending)?;
 
 		drop(content_path);
 
