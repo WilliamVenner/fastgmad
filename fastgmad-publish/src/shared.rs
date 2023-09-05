@@ -13,7 +13,8 @@ pub trait PublishStateInterface {
 	fn start_item_update(
 		&self,
 		details: ItemUpdate,
-		progress_callback: Box<dyn FnMut(ItemUpdateStatus, u64, u64)>,
+		tick_callback: &mut dyn FnMut(),
+		progress_callback: &mut dyn FnMut(ItemUpdateStatus, u64, u64),
 	) -> Result<CompletedItemUpdate, PublishError>;
 }
 
@@ -21,6 +22,7 @@ pub trait CreatedItemInterface {
 	fn mark_as_successful(&mut self);
 	fn file_id(&self) -> u64;
 	fn legal_agreement_pending(&self) -> bool;
+	fn delete(&mut self);
 }
 
 #[repr(C)]

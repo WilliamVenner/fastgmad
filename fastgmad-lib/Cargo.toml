@@ -8,7 +8,7 @@ description = "Fast gmad and gmpublish implementation"
 repository = "https://github.com/WilliamVenner/fastgmad"
 
 [features]
-binary = ["dep:libloading", "workshop"]
+binary = ["dep:libloading", "dep:ctrlc", "workshop"]
 workshop = ["dep:steamworks"]
 
 [dependencies]
@@ -20,6 +20,7 @@ memchr = "2"
 byteorder = "1"
 uuid = { version = "1", features = ["v4"] }
 log = "0.4"
+ctrlc = { version = "3", optional = true }
 steamworks = { version = "0.9", optional = true }
 libloading = { version = "0.8", optional = true }
 

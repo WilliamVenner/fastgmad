@@ -67,13 +67,19 @@ impl CreatedItemInterface for CreatedItem {
 	fn legal_agreement_pending(&self) -> bool {
 		self.legal_agreement_pending
 	}
+
+	fn delete(&mut self) {
+		self.keep_on_drop = true;
+
+		run_steam_api!(callback => self.state.single => self.state.client.ugc().delete_item(steamworks::PublishedFileId(self.file_id), callback))
+		.ok();
+	}
 }
 impl Drop for CreatedItem {
 	fn drop(&mut self) {
 		if !self.keep_on_drop {
 			// Delete the item
-			run_steam_api!(callback => self.state.single => self.state.client.ugc().delete_item(steamworks::PublishedFileId(self.file_id), callback))
-				.ok();
+			self.delete();
 		}
 	}
 }
@@ -95,7 +101,8 @@ impl PublishStateInterface for Rc<PublishState> {
 	fn start_item_update(
 		&self,
 		details: ItemUpdate,
-		mut progress_callback: Box<dyn FnMut(ItemUpdateStatus, u64, u64)>,
+		tick_callback: &mut dyn FnMut(),
+		progress_callback: &mut dyn FnMut(ItemUpdateStatus, u64, u64),
 	) -> Result<CompletedItemUpdate, PublishError> {
 		let mut update = self
 			.client
@@ -116,11 +123,13 @@ impl PublishStateInterface for Rc<PublishState> {
 
 		let (tx, rx) = std::sync::mpsc::sync_channel(1);
 
-		let update: steamworks::UpdateWatchHandle<steamworks::ClientManager> = update.submit(details.change_note, move |res| {
+		let update = update.submit(details.change_note, move |res| {
 			tx.send(res).ok();
 		});
 
 		let res = loop {
+			tick_callback();
+
 			let (status, progress, total) = update.progress();
 			progress_callback(ItemUpdateStatus::from(status), progress, total);
 

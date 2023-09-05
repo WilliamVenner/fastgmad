@@ -205,13 +205,13 @@ trait CreateGma<W: Write> {
 struct StandardCreateGma;
 impl<W: Write> CreateGma<W> for StandardCreateGma {
 	fn write_entries(
-		conf: &CreateGmaConfig,
+		_conf: &CreateGmaConfig,
 		w: &mut W,
 		#[cfg(feature = "binary")] total_size: u64,
 		entries: &[GmaFileEntry],
 	) -> Result<(), anyhow::Error> {
 		#[cfg(feature = "binary")]
-		let mut progress = if !conf.noprogress {
+		let mut progress = if !_conf.noprogress {
 			Some(crate::util::ProgressPrinter::new(total_size))
 		}else {
 			None

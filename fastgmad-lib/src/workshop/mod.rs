@@ -30,6 +30,68 @@ use std::{
 };
 use uuid::Uuid;
 
+#[cfg(feature = "binary")]
+mod ctrlc_handling {
+	// cargo build --release --package fastgmad-publish --features binary && cargo run --release --package fastgmad-bin -- publish -addon C:\Users\William\Documents\GitHub\fastgmad\fastgmad-lib\test_data\wiremod.gma
+
+	struct CtrlCState {
+		handles: usize,
+		pressed: bool,
+	}
+
+	static CTRL_C_INSTALLED: std::sync::Once = std::sync::Once::new();
+	static CTRL_C_STATE: std::sync::Mutex<CtrlCState> = std::sync::Mutex::new(CtrlCState { handles: 0, pressed: false });
+
+	fn exit_ctrlc() {
+		std::process::exit(if cfg!(windows) {
+			-1073741510
+		} else if cfg!(unix) {
+			130
+		} else {
+			1
+		});
+	}
+
+	pub struct CtrlCHandle;
+	impl CtrlCHandle {
+		pub fn get() -> Self {
+			let mut state = CTRL_C_STATE.lock().unwrap();
+
+			state.handles += 1;
+
+			CTRL_C_INSTALLED.call_once(|| {
+				ctrlc::set_handler(|| {
+					let mut state = CTRL_C_STATE.lock().unwrap();
+					if state.handles == 0 {
+						exit_ctrlc();
+					} else {
+						state.pressed = true;
+						log::warn!("Aborting, please wait...");
+					}
+				})
+				.ok();
+			});
+
+			drop(state);
+
+			CtrlCHandle
+		}
+
+		pub fn check(&self, cleanup: impl FnOnce()) {
+			if CTRL_C_STATE.lock().unwrap().pressed {
+				cleanup();
+				exit_ctrlc();
+				log::warn!("Aborted by user");
+			}
+		}
+	}
+	impl Drop for CtrlCHandle {
+		fn drop(&mut self) {
+			CTRL_C_STATE.lock().unwrap().handles -= 1;
+		}
+	}
+}
+
 const LEGAL_AGREEMENT_MESSAGE: &str = r#"
 You must accept the Steam Workshop legal agreement before you can make your addon public.
 You can do this at https://steamcommunity.com/sharedfiles/workshoplegalagreement
@@ -70,6 +132,8 @@ fn workshop_upload(#[cfg(feature = "binary")] noprogress: bool, kind: PublishKin
 	// For some reason we need to manually check the icon file size
 	// Steam just hangs forever if the icon is invalid
 	if let Some(icon) = icon {
+		log::info!("Checking icon...");
+
 		let icon_size = std::fs::metadata(icon)
 			.map_err(|err| anyhow::anyhow!("Failed to read icon: {err}"))?
 			.len();
@@ -100,10 +164,34 @@ fn workshop_upload(#[cfg(feature = "binary")] noprogress: bool, kind: PublishKin
 	match &kind {
 		PublishKind::Create => {
 			log::info!("Creating new Workshop item...");
-			let created = steam.create_item()?;
+
+			#[cfg(feature = "binary")]
+			let ctrlc_handle = ctrlc_handling::CtrlCHandle::get();
+
+			let mut created = steam.create_item()?;
+
+			#[cfg(feature = "binary")] {
+				ctrlc_handle.check(|| {
+					created.delete();
+				});
+			}
+			#[cfg(not(feature = "binary"))] {
+				// HACK! Suppress unused `mut` warning
+				created = created;
+			}
+
 			file_id = created.file_id();
 			legal_agreement_pending = created.legal_agreement_pending();
-			created_item = Some(created);
+			created_item = Some((created, {
+				#[cfg(feature = "binary")]
+				{
+					ctrlc_handle
+				}
+				#[cfg(not(feature = "binary"))]
+				{
+					()
+				}
+			}));
 		}
 		PublishKind::Update { id, .. } => {
 			file_id = *id;
@@ -167,65 +255,83 @@ fn workshop_upload(#[cfg(feature = "binary")] noprogress: bool, kind: PublishKin
 		let res = {
 			let mut status = None;
 
-			#[cfg(feature = "binary")]
-			let progress_callback = {
-				let mut total = None;
-				let mut progress_printer = None;
+			let mut progress_callback;
+			let mut tick_callback;
 
-				move |new_status, new_progress, new_total| {
+			#[cfg(feature = "binary")]
+			{
+				progress_callback = {
+					let mut total = None;
+					let mut progress_printer = None;
+
+					move |new_status, new_progress, new_total| {
+						let new_status = if new_status != ItemUpdateStatus::Invalid {
+							Some(new_status)
+						} else {
+							None
+						};
+						let did_status_change = core::mem::replace(&mut status, new_status) != new_status;
+
+						let new_total = std::num::NonZeroU64::new(new_total);
+						let did_total_change = core::mem::replace(&mut total, new_total) != new_total;
+
+						if did_status_change {
+							if let Some(new_status) = new_status {
+								progress_printer = None; // Reset progress printer so we can print
+								log::info!("{}", update_status_str(&new_status));
+							}
+						}
+						if did_status_change || did_total_change {
+							progress_printer = match (noprogress, new_status, new_total) {
+								(false, Some(_), Some(new_total)) => Some(crate::util::ProgressPrinter::new(new_total.get())),
+								_ => None,
+							};
+						}
+
+						if let Some(progress_printer) = &mut progress_printer {
+							progress_printer.set_progress(new_progress);
+						}
+					}
+				};
+
+				tick_callback = || {
+					if let Some((created_item, ctrlc_handle)) = created_item.as_mut() {
+						ctrlc_handle.check(|| {
+							// If a CTRL+C occurs, delete the newly created item
+							created_item.delete();
+						});
+					}
+				};
+			}
+
+			#[cfg(not(feature = "binary"))]
+			{
+				progress_callback = move |new_status, _new_progress, _new_total| {
 					let new_status = if new_status != ItemUpdateStatus::Invalid {
 						Some(new_status)
 					} else {
 						None
 					};
+
 					let did_status_change = core::mem::replace(&mut status, new_status) != new_status;
-
-					let new_total = std::num::NonZeroU64::new(new_total);
-					let did_total_change = core::mem::replace(&mut total, new_total) != new_total;
-
 					if did_status_change {
 						if let Some(new_status) = new_status {
-							progress_printer = None; // Reset progress printer so we can print
 							log::info!("{}", update_status_str(&new_status));
 						}
 					}
-					if did_status_change || did_total_change {
-						progress_printer = match (noprogress, new_status, new_total) {
-							(false, Some(_), Some(new_total)) => Some(crate::util::ProgressPrinter::new(new_total.get())),
-							_ => None,
-						};
-					}
-
-					if let Some(progress_printer) = &mut progress_printer {
-						progress_printer.set_progress(new_progress);
-					}
-				}
-			};
-
-			#[cfg(not(feature = "binary"))]
-			let progress_callback = move |new_status, _new_progress, _new_total| {
-				let new_status = if new_status != ItemUpdateStatus::Invalid {
-					Some(new_status)
-				} else {
-					None
 				};
 
-				let did_status_change = core::mem::replace(&mut status, new_status) != new_status;
-				if did_status_change {
-					if let Some(new_status) = new_status {
-						log::info!("{}", update_status_str(&new_status));
-					}
-				}
-			};
+				tick_callback = || ();
+			}
 
-			steam.start_item_update(details, Box::new(progress_callback))
+			steam.start_item_update(details, &mut tick_callback, &mut progress_callback)
 		};
 
 		legal_agreement_pending |= res.map(|CompletedItemUpdate { legal_agreement_pending }| legal_agreement_pending)?;
 
 		// Everything OK!
 		// Make sure we don't delete the newly created item
-		if let Some(mut created_item) = created_item {
+		if let Some((mut created_item, _)) = created_item {
 			created_item.mark_as_successful();
 		}
 
@@ -243,12 +349,19 @@ fn workshop_upload(#[cfg(feature = "binary")] noprogress: bool, kind: PublishKin
 
 /// Publishes a GMA to the Steam Workshop
 pub fn publish_gma(conf: &WorkshopPublishConfig) -> Result<u64, anyhow::Error> {
-	workshop_upload(conf.noprogress, PublishKind::Create, &conf.addon, conf.icon.as_deref())
+	workshop_upload(
+		#[cfg(feature = "binary")]
+		conf.noprogress,
+		PublishKind::Create,
+		&conf.addon,
+		conf.icon.as_deref(),
+	)
 }
 
 /// Updates a GMA on the Steam Workshop
 pub fn update_gma(conf: &WorkshopUpdateConfig) -> Result<(), anyhow::Error> {
 	workshop_upload(
+		#[cfg(feature = "binary")]
 		conf.noprogress,
 		PublishKind::Update {
 			id: conf.id,
@@ -259,8 +372,6 @@ pub fn update_gma(conf: &WorkshopUpdateConfig) -> Result<(), anyhow::Error> {
 	)
 	.map(|_| ())
 }
-
-// TODO ctrlc handler
 
 struct ContentPath(PathBuf);
 impl ContentPath {

@@ -56,7 +56,6 @@ mod binary {
 	pub struct PrintHelp(pub Option<&'static str>);
 
 	pub struct ProgressPrinter {
-		stderr: std::io::StderrLock<'static>,
 		progress: u64,
 		progress_max: u64,
 		backspaces: usize,
@@ -67,7 +66,6 @@ mod binary {
 
 		pub fn new(progress_max: u64) -> Self {
 			Self {
-				stderr: std::io::stderr().lock(),
 				progress_max,
 				progress: Default::default(),
 				backspaces: 0,
@@ -90,14 +88,17 @@ mod binary {
 
 				let progress_pct = format!("{filled}{outlined} {:.02}%", progress_pct * 100.0);
 				let backspaces = core::mem::replace(&mut self.backspaces, progress_pct.len());
-				self.stderr.write_all("\u{8}".repeat(backspaces).as_bytes()).ok();
-				self.stderr.write_all(progress_pct.as_bytes()).ok();
-				self.stderr.flush().ok();
+
+				let mut stderr = std::io::stderr().lock();
+				stderr.write_all("\u{8}".repeat(backspaces).as_bytes()).ok();
+				stderr.write_all(progress_pct.as_bytes()).ok();
+				stderr.flush().ok();
 			} else {
 				let backspaces = core::mem::replace(&mut self.backspaces, 0);
 				if backspaces > 0 {
-					self.stderr.write_all("\u{8}".repeat(backspaces).as_bytes()).ok();
-					self.stderr.flush().ok();
+					let mut stderr = std::io::stderr().lock();
+					stderr.write_all("\u{8}".repeat(backspaces).as_bytes()).ok();
+					stderr.flush().ok();
 				}
 			}
 		}
@@ -105,10 +106,11 @@ mod binary {
 
 	impl Drop for ProgressPrinter {
 		fn drop(&mut self) {
-			self.stderr.write_all("\u{8}".repeat(self.backspaces).as_bytes()).ok();
-			self.stderr.write_all(" ".repeat(self.backspaces).as_bytes()).ok();
-			self.stderr.write_all("\u{8}".repeat(self.backspaces).as_bytes()).ok();
-			self.stderr.flush().ok();
+			let mut stderr = std::io::stderr().lock();
+			stderr.write_all("\u{8}".repeat(self.backspaces).as_bytes()).ok();
+			stderr.write_all(" ".repeat(self.backspaces).as_bytes()).ok();
+			stderr.write_all("\u{8}".repeat(self.backspaces).as_bytes()).ok();
+			stderr.flush().ok();
 		}
 	}
 }
