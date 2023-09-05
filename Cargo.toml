@@ -34,3 +34,5 @@ log = "0.4"
 
 [dev-dependencies]
 lazy_static = "1"
+sysreq = "0.1.6"
+zip = "0.6"

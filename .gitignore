@@ -1,3 +1,2 @@
 /target
-benches/data
-tests/data
+test_data/

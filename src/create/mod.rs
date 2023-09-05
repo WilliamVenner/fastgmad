@@ -147,6 +147,7 @@ trait CreateGma<W: Write> {
 		// File list
 		log::info!("Writing file list...");
 
+		#[cfg(feature = "binary")]
 		let mut total_size = 0;
 		for (num, GmaFileEntry { size, relative_path, .. }) in entries.iter().enumerate() {
 			// File number
@@ -163,7 +164,9 @@ trait CreateGma<W: Write> {
 			// CRC (unused)
 			w.write_all(&[0u8; 4])?;
 
-			total_size += *size;
+			#[cfg(feature = "binary")] {
+				total_size += *size;
+			}
 		}
 
 		// Zero to signify end of files
@@ -172,7 +175,7 @@ trait CreateGma<W: Write> {
 		// Write entries
 		log::info!("Writing file contents...");
 
-		Self::write_entries(conf, w, total_size, &entries)?;
+		Self::write_entries(conf, w, #[cfg(feature = "binary")] total_size, &entries)?;
 
 		// Explicitly free memory here
 		// We may exit the process in done_callback (thereby allowing the OS to free the memory),
