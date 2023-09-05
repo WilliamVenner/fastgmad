@@ -127,6 +127,7 @@ fn bin() -> Result<(), FastGmadBinError> {
 fn create(conf: CreateGmaConfig, out: CreateGmadOut, exit: &mut impl FnMut()) -> Result<(), FastGmadBinError> {
 	match out {
 		CreateGmadOut::File(path) => {
+			log::info!("Opening output file...");
 			let mut w = BufWriter::new(File::create(path)?);
 			fastgmad::create::seekable_create_gma_with_done_callback(&conf, &mut w, exit)?;
 		}
@@ -146,6 +147,7 @@ fn create(conf: CreateGmaConfig, out: CreateGmadOut, exit: &mut impl FnMut()) ->
 fn extract(conf: ExtractGmaConfig, r#in: ExtractGmadIn, exit: &mut impl FnMut()) -> Result<(), FastGmadBinError> {
 	match r#in {
 		ExtractGmadIn::File(path) => {
+			log::info!("Opening input file...");
 			let mut r = BufReader::new(File::open(path)?);
 			fastgmad::extract::extract_gma_with_done_callback(&conf, &mut r, exit)?;
 		}
