@@ -212,7 +212,7 @@ fn publish(conf: WorkshopPublishConfig) -> Result<(), FastGmadBinError> {
 }
 
 fn update(conf: WorkshopUpdateConfig) -> Result<(), FastGmadBinError> {
-	log::info!(
+	log::warn!(
 		">> You are UPDATING the Workshop item https://steamcommunity.com/sharedfiles/filedetails/?id={} <<\n",
 		conf.id
 	);
