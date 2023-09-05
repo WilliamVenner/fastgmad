@@ -1,0 +1,63 @@
+name: build
+
+on:
+  push:
+    tags:
+      - 'v*.*.*'
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  build_linux:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v2
+    - name: Build
+      run: cargo build --release --all-features --bin fastgmad
+    - name: Zip
+      run: |
+        7z a -tzip -mx=9 target/release/fastgmad_linux.zip ./target/release/fastgmad ./steam_api_sdk/redistributable_bin/linux64/libsteam_api.so
+    - name: Release
+      uses: softprops/action-gh-release@v1
+      with:
+        files: |
+          target/release/fastgmad_linux.zip
+      env:
+        GITHUB_TOKEN: ${{ secrets.GH_TOKEN }}
+
+  build_windows:
+    runs-on: windows-latest
+    steps:
+    - uses: actions/checkout@v2
+    - name: Build
+      run: cargo build --release --all-features --bin fastgmad
+      env:
+        RUSTFLAGS: -Ctarget-feature=+crt-static
+    - name: Zip
+      run: |
+        7z a -tzip -mx=9 target/release/fastgmad_windows.zip ./target/release/fastgmad.exe ./steam_api_sdk/redistributable_bin/win64/steam_api64.dll
+    - name: Release
+      uses: softprops/action-gh-release@v1
+      with:
+        files: |
+          target/release/fastgmad_windows.zip
+      env:
+        GITHUB_TOKEN: ${{ secrets.GH_TOKEN }}
+
+  build_macos:
+    runs-on: macos-latest
+    steps:
+    - uses: actions/checkout@v2
+    - name: Build
+      run: cargo build --release --all-features --bin fastgmad
+    - name: Zip
+      run: |
+        7z a -tzip -mx=9 target/release/fastgmad_macos.zip ./target/release/fastgmad ./steam_api_sdk/redistributable_bin/osx/libsteam_api.dylib
+    - name: Release
+      uses: softprops/action-gh-release@v1
+      with:
+        files: |
+          target/release/fastgmad_macos.zip
+      env:
+        GITHUB_TOKEN: ${{ secrets.GH_TOKEN }}
