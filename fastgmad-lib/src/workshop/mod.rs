@@ -65,7 +65,10 @@ mod ctrlc_handling {
 					if state.handles == 0 {
 						exit_ctrlc();
 					} else {
-						state.pressed = true;
+						if core::mem::replace(&mut state.pressed, true) {
+							// Already pressed, exit immediately
+							exit_ctrlc();
+						}
 						eprintln!();
 						log::warn!("Aborting, please wait...");
 					}
