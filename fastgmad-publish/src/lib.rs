@@ -101,6 +101,7 @@ impl PublishStateInterface for Rc<PublishState> {
 			.client
 			.ugc()
 			.start_item_update(GMOD_APP_ID, steamworks::PublishedFileId(details.file_id));
+
 		update = update.content_path(details.content_path);
 		update = update.tags(details.tags.to_vec());
 		if let Some(description) = details.description {

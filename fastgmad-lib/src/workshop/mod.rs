@@ -67,6 +67,17 @@ enum PublishKind<'a> {
 	Update { id: u64, changes: Option<&'a str> },
 }
 fn workshop_upload(kind: PublishKind, addon: &Path, icon: Option<&Path>) -> Result<u64, anyhow::Error> {
+	// For some reason we need to manually check the icon file size
+	// Steam just hangs forever if the icon is invalid
+	if let Some(icon) = icon {
+		let icon_size = std::fs::metadata(icon).map_err(|err| anyhow::anyhow!("Failed to read icon: {err}"))?.len();
+		if icon_size < WORKSHOP_ICON_MIN_SIZE {
+			return Err(anyhow::anyhow!("Icon is too small ({icon_size} bytes), must be at least {WORKSHOP_ICON_MAX_SIZE} bytes"));
+		} else if icon_size > WORKSHOP_ICON_MAX_SIZE {
+			return Err(anyhow::anyhow!("Icon is too large ({icon_size} bytes), must be at most {WORKSHOP_ICON_MAX_SIZE} bytes"));
+		}
+	}
+
 	log::info!("Initializing Steam...");
 	let steam = init_steam()?;
 
@@ -382,3 +393,5 @@ fn update_status_str(status: &ItemUpdateStatus) -> &'static str {
 }
 
 const WORKSHOP_DEFAULT_ICON: &[u8] = include_bytes!("gmpublisher_default_icon.png");
+const WORKSHOP_ICON_MAX_SIZE: u64 = 1048576;
+const WORKSHOP_ICON_MIN_SIZE: u64 = 16;
