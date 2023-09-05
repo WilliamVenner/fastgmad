@@ -22,7 +22,7 @@ pub struct ExtractGmaConfig {
 	pub max_io_memory_usage: NonZeroUsize,
 
 	#[cfg(feature = "binary")]
-	pub noprogress: bool, // TODO
+	pub noprogress: bool,
 }
 impl ExtractGmaConfig {
 	#[cfg(feature = "binary")]

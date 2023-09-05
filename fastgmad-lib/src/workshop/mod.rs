@@ -66,15 +66,22 @@ enum PublishKind<'a> {
 	Create,
 	Update { id: u64, changes: Option<&'a str> },
 }
-fn workshop_upload(kind: PublishKind, addon: &Path, icon: Option<&Path>) -> Result<u64, anyhow::Error> {
+fn workshop_upload(#[cfg(feature = "binary")] noprogress: bool, kind: PublishKind, addon: &Path, icon: Option<&Path>) -> Result<u64, anyhow::Error> {
 	// For some reason we need to manually check the icon file size
 	// Steam just hangs forever if the icon is invalid
 	if let Some(icon) = icon {
-		let icon_size = std::fs::metadata(icon).map_err(|err| anyhow::anyhow!("Failed to read icon: {err}"))?.len();
+		let icon_size = std::fs::metadata(icon)
+			.map_err(|err| anyhow::anyhow!("Failed to read icon: {err}"))?
+			.len();
+
 		if icon_size < WORKSHOP_ICON_MIN_SIZE {
-			return Err(anyhow::anyhow!("Icon is too small ({icon_size} bytes), must be at least {WORKSHOP_ICON_MAX_SIZE} bytes"));
+			return Err(anyhow::anyhow!(
+				"Icon is too small ({icon_size} bytes), must be at least {WORKSHOP_ICON_MAX_SIZE} bytes"
+			));
 		} else if icon_size > WORKSHOP_ICON_MAX_SIZE {
-			return Err(anyhow::anyhow!("Icon is too large ({icon_size} bytes), must be at most {WORKSHOP_ICON_MAX_SIZE} bytes"));
+			return Err(anyhow::anyhow!(
+				"Icon is too large ({icon_size} bytes), must be at most {WORKSHOP_ICON_MAX_SIZE} bytes"
+			));
 		}
 	}
 
@@ -183,8 +190,8 @@ fn workshop_upload(kind: PublishKind, addon: &Path, icon: Option<&Path>) -> Resu
 						}
 					}
 					if did_status_change || did_total_change {
-						progress_printer = match (new_status, new_total) {
-							(Some(_), Some(new_total)) => Some(crate::util::ProgressPrinter::new(new_total.get())),
+						progress_printer = match (noprogress, new_status, new_total) {
+							(false, Some(_), Some(new_total)) => Some(crate::util::ProgressPrinter::new(new_total.get())),
 							_ => None,
 						};
 					}
@@ -236,12 +243,13 @@ fn workshop_upload(kind: PublishKind, addon: &Path, icon: Option<&Path>) -> Resu
 
 /// Publishes a GMA to the Steam Workshop
 pub fn publish_gma(conf: &WorkshopPublishConfig) -> Result<u64, anyhow::Error> {
-	workshop_upload(PublishKind::Create, &conf.addon, conf.icon.as_deref())
+	workshop_upload(conf.noprogress, PublishKind::Create, &conf.addon, conf.icon.as_deref())
 }
 
 /// Updates a GMA on the Steam Workshop
 pub fn update_gma(conf: &WorkshopUpdateConfig) -> Result<(), anyhow::Error> {
 	workshop_upload(
+		conf.noprogress,
 		PublishKind::Update {
 			id: conf.id,
 			changes: conf.changes.as_deref(),

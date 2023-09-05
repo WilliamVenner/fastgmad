@@ -205,19 +205,25 @@ trait CreateGma<W: Write> {
 struct StandardCreateGma;
 impl<W: Write> CreateGma<W> for StandardCreateGma {
 	fn write_entries(
-		_conf: &CreateGmaConfig,
+		conf: &CreateGmaConfig,
 		w: &mut W,
 		#[cfg(feature = "binary")] total_size: u64,
 		entries: &[GmaFileEntry],
 	) -> Result<(), anyhow::Error> {
 		#[cfg(feature = "binary")]
-		let mut progress = crate::util::ProgressPrinter::new(total_size);
+		let mut progress = if !conf.noprogress {
+			Some(crate::util::ProgressPrinter::new(total_size))
+		}else {
+			None
+		};
 
 		for entry in entries.iter() {
 			std::io::copy(&mut File::open(&entry.path)?, w)?;
 
 			#[cfg(feature = "binary")]
-			progress.add_progress(entry.size);
+			if let Some(progress) = &mut progress {
+				progress.add_progress(entry.size);
+			}
 		}
 
 		Ok(())
@@ -233,7 +239,11 @@ impl<W: Write + Seek> CreateGma<W> for ParallelCreateGma {
 		entries: &[GmaFileEntry],
 	) -> Result<(), anyhow::Error> {
 		#[cfg(feature = "binary")]
-		let mut progress = crate::util::ProgressPrinter::new(total_size);
+		let mut progress = if !conf.noprogress {
+			Some(crate::util::ProgressPrinter::new(total_size))
+		}else {
+			None
+		};
 
 		let (tx, rx) = std::sync::mpsc::sync_channel(0);
 
@@ -341,7 +351,9 @@ impl<W: Write + Seek> CreateGma<W> for ParallelCreateGma {
 				w.write_all(&contents)?;
 
 				#[cfg(feature = "binary")]
-				progress.add_progress(contents.len() as u64);
+				if let Some(progress) = &mut progress {
+					progress.add_progress(contents.len() as u64);
+				}
 
 				let contents_size = contents.len();
 				drop(contents);
@@ -357,7 +369,9 @@ impl<W: Write + Seek> CreateGma<W> for ParallelCreateGma {
 			std::io::copy(&mut File::open(&entry.path)?, w)?;
 
 			#[cfg(feature = "binary")]
-			progress.add_progress(entry.size);
+			if let Some(progress) = &mut progress {
+				progress.add_progress(entry.size);
+			}
 		}
 
 		w.flush()?;

@@ -179,7 +179,11 @@ impl ExtractGma for StandardExtractGma {
 		file_index: &[GmaEntry],
 	) -> Result<(), anyhow::Error> {
 		#[cfg(feature = "binary")]
-		let mut progress = crate::util::ProgressPrinter::new(total_size);
+		let mut progress = if !conf.noprogress {
+			Some(crate::util::ProgressPrinter::new(total_size))
+		}else {
+			None
+		};
 
 		for GmaEntry { path, size } in file_index.iter() {
 			if let Some(parent) = path.parent() {
@@ -195,7 +199,9 @@ impl ExtractGma for StandardExtractGma {
 			r = take.into_inner();
 
 			#[cfg(feature = "binary")]
-			progress.add_progress(*size as u64);
+			if let Some(progress) = &mut progress {
+				progress.add_progress(*size as u64);
+			}
 		}
 
 		Ok(())
@@ -211,7 +217,11 @@ impl ExtractGma for ParallelExtractGma {
 		file_index: &[GmaEntry],
 	) -> Result<(), anyhow::Error> {
 		#[cfg(feature = "binary")]
-		let mut progress = crate::util::ProgressPrinter::new(total_size);
+		let mut progress = if !conf.noprogress {
+			Some(crate::util::ProgressPrinter::new(total_size))
+		}else {
+			None
+		};
 
 		let memory_used = AtomicUsize::new(0);
 		let error = Mutex::new(None);
@@ -283,7 +293,9 @@ impl ExtractGma for ParallelExtractGma {
 				}
 
 				#[cfg(feature = "binary")]
-				progress.add_progress(*size as u64);
+				if let Some(progress) = &mut progress {
+					progress.add_progress(*size as u64);
+				}
 			}
 
 			Ok::<_, anyhow::Error>(())
