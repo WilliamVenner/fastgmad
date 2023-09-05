@@ -1,0 +1,51 @@
+name: ci
+
+on:
+  push:
+    branches:
+      - master
+  pull_request:
+    branches:
+      - master
+
+jobs:
+  check:
+    name: Check ${{ matrix.target }} ${{ matrix.release }} ${{ matrix.features }}
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        target: ["--all", "--package fastgmad"]
+        release: ["", "--release"]
+        features: ["", "--all-features", "--features workshop"]
+        exclude:
+          # Exclude combinations that are not needed
+          - target: "--all"
+            features: "--features workshop"
+          - target: "--all"
+            features: "--all-features"
+          - target: "--package fastgmad"
+            features: "--all-features"
+
+    steps:
+    - uses: actions/checkout@v2
+    - name: Check
+      run: cargo check ${{ matrix.release }} ${{ matrix.target }} ${{ matrix.features }}
+
+  check_fmt:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v2
+    - name: Check
+      run: cargo fmt --all -- --check
+
+  test:
+    name: Test ${{ matrix.release }}
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        release: ["", "--release"]
+
+    steps:
+    - uses: actions/checkout@v2
+    - name: Test
+      run: cargo test --all ${{ matrix.release }}
