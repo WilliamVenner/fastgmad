@@ -140,6 +140,8 @@ trait ExtractGma {
 		}
 
 		// File contents
+		log::info!("Extracting entries...");
+
 		Self::write_entries(
 			conf,
 			r,
