@@ -1,49 +1,3 @@
-const HELP: &str = concat!(
-	r#"
-Drag & Drop
------------
-Drag & drop a .gma onto fastgmad to extract it
-Drag & drop a folder onto fastgmad to convert it to .gma
-
-Creating GMAs
--------------
-fastgmad create -folder path/to/folder -out path/to/gma.gma
-fastgmad create -folder path/to/folder -out path/to/gma.gma
-fastgmad create -folder path/to/folder
-fastgmad create -folder path/to/folder -stdout
-
-Extracting GMAs
----------------
-fastgmad extract -file path/to/gma.gma -out path/to/folder
-fastgmad extract -file path/to/gma.gma
-fastgmad extract -stdin -out path/to/folder
-
-Publishing GMAs
----------------
->> Adding an icon is OPTIONAL for publishing a new Workshop addon. A default icon will be provided for you if you don't add one.
-Accepted Icon Formats: JPG, PNG, GIF
-Icon Max Size: 1 MB
-Recommended Icon Dimensions: 512x512
-
-fastgmad publish -addon path/to/gma.gma -icon path/to/icon
-fastgmad update -id 1337 -addon path/to/gma.gma
-fastgmad update -id 1337 -addon path/to/gma.gma -icon path/to/icon
-fastgmad update -id 1337 -addon path/to/gma.gma -changes "fixed something"
-fastgmad update -id 1337 -addon path/to/gma.gma -changes "fixed something" -icon path/to/icon
-
-Additional flags
-----------------
--max-io-threads <integer> - The maximum number of threads to use for reading and writing files. Defaults to the number of logical cores on the system.
--max-io-memory-usage <integer> - The maximum amount of memory to use for reading and writing files in parallel. Defaults to 2 GiB.
--warninvalid - Warns rather than errors if the GMA contains invalid files. Off by default.
--noprogress - Turns off progress bars.
-
-Notes
------
-- CRC checking and computation is not a feature. Implementing this would slow down the program for no benefit and it is virtually unused and redundant in Garry's Mod.
-"#
-);
-
 use fastgmad::{
 	create::{CreateGmaConfig, CreateGmadOut},
 	extract::{ExtractGmaConfig, ExtractGmadIn},
@@ -110,7 +64,7 @@ fn main() {
 				log::error!("{msg}\n");
 			}
 
-			eprintln!("{}", HELP.trim());
+			eprintln!("{}", include_str!("usage.txt"));
 		}
 	}
 }
