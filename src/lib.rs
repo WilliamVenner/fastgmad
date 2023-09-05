@@ -1,4 +1,10 @@
 //! Fast gmad and gmpublish implementation
+//!
+//! # Feature flags
+//!
+//! `workshop` - Workshop publishing support
+//!
+//! `binary` - This is a private internal feature flag for the binary target
 
 #![cfg_attr(not(feature = "binary"), warn(missing_docs))]
 
