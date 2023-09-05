@@ -16,7 +16,7 @@ mod fastgmad_publish {
 		}
 	}
 }
-use fastgmad_publish::shared::{CompletedItemUpdate, ItemUpdate, ItemUpdateStatus, PublishError, PublishStateInterface};
+use fastgmad_publish::shared::{CompletedItemUpdate, ItemUpdate, ItemUpdateStatus, PublishStateInterface};
 
 use crate::{util::BufReadEx, GMA_MAGIC, GMA_VERSION};
 use byteorder::ReadBytesExt;
@@ -40,7 +40,7 @@ Once you have accepted the agreement, you can set the visiblity of your addon to
 fn init_steam() -> Result<Box<dyn PublishStateInterface>, anyhow::Error> {
 	unsafe {
 		let lib = Box::leak(Box::new(libloading::Library::new("fastgmad_publish")?));
-		let fastgmad_publish_init: fn() -> Result<*mut dyn PublishStateInterface, PublishError> = *lib.get(b"fastgmad_publish_init")?;
+		let fastgmad_publish_init: fn() -> Result<*mut dyn PublishStateInterface, fastgmad_publish::shared::PublishError> = *lib.get(b"fastgmad_publish_init")?;
 		let interface = fastgmad_publish_init()?;
 		Ok(Box::from_raw(interface) as Box<dyn PublishStateInterface>)
 	}
@@ -48,7 +48,7 @@ fn init_steam() -> Result<Box<dyn PublishStateInterface>, anyhow::Error> {
 
 #[cfg(not(feature = "binary"))]
 fn init_steam() -> Result<Box<dyn PublishStateInterface>, anyhow::Error> {
-	Ok(Box::new(Rc::new(fastgmad_publish::PublishState::new()?)) as Box<dyn PublishStateInterface>)
+	Ok(Box::new(std::rc::Rc::new(fastgmad_publish::PublishState::new()?)) as Box<dyn PublishStateInterface>)
 }
 
 #[derive(Clone, Copy)]
@@ -175,7 +175,7 @@ fn workshop_upload(kind: PublishKind, addon: &Path, icon: Option<&Path>) -> Resu
 			};
 
 			#[cfg(not(feature = "binary"))]
-			let progress_callback = move |new_status, new_progress, new_total| {
+			let progress_callback = move |new_status, _new_progress, _new_total| {
 				let new_status = if new_status != ItemUpdateStatus::Invalid { Some(new_status) } else { None };
 
 				let did_status_change = core::mem::replace(&mut status, new_status) != new_status;
