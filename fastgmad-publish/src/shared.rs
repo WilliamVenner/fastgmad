@@ -1,7 +1,18 @@
 use std::path::Path;
 
 #[repr(C)]
+#[derive(Debug)]
 pub struct PublishError(Box<dyn std::error::Error + Send + Sync + 'static>);
+impl std::fmt::Display for PublishError {
+	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+		self.0.fmt(f)
+	}
+}
+impl std::error::Error for PublishError {
+	fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
+		self.0.source()
+	}
+}
 impl From<Box<dyn std::error::Error + Send + Sync + 'static>> for PublishError {
 	fn from(value: Box<dyn std::error::Error + Send + Sync + 'static>) -> Self {
 		Self(value)

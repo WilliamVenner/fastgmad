@@ -9,12 +9,6 @@ mod fastgmad_publish {
 
 	#[cfg(not(feature = "binary"))]
 	include!("../../../fastgmad-publish/src/lib.rs");
-
-	impl From<shared::PublishError> for anyhow::Error {
-		fn from(e: shared::PublishError) -> Self {
-			anyhow::anyhow!(e)
-		}
-	}
 }
 use fastgmad_publish::shared::{CompletedItemUpdate, ItemUpdate, ItemUpdateStatus, PublishStateInterface};
 
@@ -32,7 +26,7 @@ use uuid::Uuid;
 
 #[cfg(feature = "binary")]
 mod ctrlc_handling {
-	// cargo build --release --package fastgmad-publish --features binary && cargo run --release --package fastgmad-bin -- publish -addon C:\Users\William\Documents\GitHub\fastgmad\fastgmad-lib\test_data\wiremod.gma
+	// cargo build --package fastgmad-publish --features binary && cargo run --package fastgmad-bin -- publish -addon C:\Users\William\Documents\GitHub\fastgmad\fastgmad-lib\test_data\wiremod.gma
 
 	struct CtrlCState {
 		handles: usize,
