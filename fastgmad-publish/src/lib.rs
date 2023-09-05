@@ -72,7 +72,7 @@ impl CreatedItemInterface for CreatedItem {
 		self.keep_on_drop = true;
 
 		run_steam_api!(callback => self.state.single => self.state.client.ugc().delete_item(steamworks::PublishedFileId(self.file_id), callback))
-		.ok();
+			.ok();
 	}
 }
 impl Drop for CreatedItem {

@@ -170,12 +170,14 @@ fn workshop_upload(#[cfg(feature = "binary")] noprogress: bool, kind: PublishKin
 
 			let mut created = steam.create_item()?;
 
-			#[cfg(feature = "binary")] {
+			#[cfg(feature = "binary")]
+			{
 				ctrlc_handle.check(|| {
 					created.delete();
 				});
 			}
-			#[cfg(not(feature = "binary"))] {
+			#[cfg(not(feature = "binary"))]
+			{
 				// HACK! Suppress unused `mut` warning
 				created = created;
 			}

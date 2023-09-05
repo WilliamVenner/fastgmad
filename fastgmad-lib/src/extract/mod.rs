@@ -181,7 +181,7 @@ impl ExtractGma for StandardExtractGma {
 		#[cfg(feature = "binary")]
 		let mut progress = if !conf.noprogress {
 			Some(crate::util::ProgressPrinter::new(total_size))
-		}else {
+		} else {
 			None
 		};
 
@@ -219,7 +219,7 @@ impl ExtractGma for ParallelExtractGma {
 		#[cfg(feature = "binary")]
 		let mut progress = if !conf.noprogress {
 			Some(crate::util::ProgressPrinter::new(total_size))
-		}else {
+		} else {
 			None
 		};
 

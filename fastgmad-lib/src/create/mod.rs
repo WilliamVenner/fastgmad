@@ -213,7 +213,7 @@ impl<W: Write> CreateGma<W> for StandardCreateGma {
 		#[cfg(feature = "binary")]
 		let mut progress = if !_conf.noprogress {
 			Some(crate::util::ProgressPrinter::new(total_size))
-		}else {
+		} else {
 			None
 		};
 
@@ -241,7 +241,7 @@ impl<W: Write + Seek> CreateGma<W> for ParallelCreateGma {
 		#[cfg(feature = "binary")]
 		let mut progress = if !conf.noprogress {
 			Some(crate::util::ProgressPrinter::new(total_size))
-		}else {
+		} else {
 			None
 		};
 
