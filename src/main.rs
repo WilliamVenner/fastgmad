@@ -161,7 +161,7 @@ fn extract(conf: ExtractGmaConfig, r#in: ExtractGmadIn, exit: &mut impl FnMut())
 fn publish(conf: WorkshopPublishConfig) -> Result<(), FastGmadBinError> {
 	let id = fastgmad::workshop::publish_gma(&conf)?;
 	println!("{}", id.0);
-	log::info!("\nPublished to https://steamcommunity.com/sharedfiles/filedetails/?id={}", id.0);
+	log::info!("Published to https://steamcommunity.com/sharedfiles/filedetails/?id={}", id.0);
 	Ok(())
 }
 
@@ -172,7 +172,7 @@ fn update(conf: WorkshopUpdateConfig) -> Result<(), FastGmadBinError> {
 	);
 	fastgmad::workshop::update_gma(&conf)?;
 	println!("{}", conf.id);
-	log::info!("\nUpdated https://steamcommunity.com/sharedfiles/filedetails/?id={}", conf.id);
+	log::info!("Updated https://steamcommunity.com/sharedfiles/filedetails/?id={}", conf.id);
 	Ok(())
 }
 

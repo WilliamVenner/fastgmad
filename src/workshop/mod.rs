@@ -1,16 +1,12 @@
 mod conf;
 pub use conf::{WorkshopPublishConfig, WorkshopUpdateConfig};
 
-use crate::{
-	util::{BufReadEx, ProgressPrinter},
-	GMA_MAGIC, GMA_VERSION,
-};
+use crate::{util::BufReadEx, GMA_MAGIC, GMA_VERSION};
 use byteorder::ReadBytesExt;
 use std::{
 	borrow::Cow,
 	fs::File,
 	io::{BufReader, Read},
-	num::NonZeroU64,
 	path::Path,
 	path::PathBuf,
 	time::Duration,
@@ -27,6 +23,17 @@ Once you have accepted the agreement, you can set the visiblity of your addon to
 const WORKSHOP_DEFAULT_ICON: &[u8] = include_bytes!("gmpublisher_default_icon.png");
 
 const GMOD_APPID: steamworks::AppId = steamworks::AppId(4000);
+
+fn update_status_str(status: &UpdateStatus) -> &'static str {
+	match status {
+		UpdateStatus::PreparingConfig => "Preparing config...",
+		UpdateStatus::PreparingContent => "Preparing content...",
+		UpdateStatus::UploadingContent => "Uploading content...",
+		UpdateStatus::UploadingPreviewFile => "Uploading preview file...",
+		UpdateStatus::CommittingChanges => "Committing changes...",
+		UpdateStatus::Invalid => "",
+	}
+}
 
 #[derive(Clone, Copy)]
 enum PublishKind<'a> {
@@ -118,7 +125,11 @@ fn workshop_upload(kind: PublishKind, addon: &Path, icon: Option<&Path>) -> Resu
 
 		let res = {
 			let mut status = None;
+
+			#[cfg(feature = "binary")]
 			let mut total = None;
+
+			#[cfg(feature = "binary")]
 			let mut progress_printer = None;
 
 			let (tx, rx) = std::sync::mpsc::sync_channel(1);
@@ -131,18 +142,26 @@ fn workshop_upload(kind: PublishKind, addon: &Path, icon: Option<&Path>) -> Resu
 					Err(std::sync::mpsc::RecvTimeoutError::Disconnected) => {
 						return Err(steamworks::SteamError::RemoteDisconnect);
 					}
+
+					#[cfg(feature = "binary")]
 					Err(std::sync::mpsc::RecvTimeoutError::Timeout) => {
 						let (new_status, new_progress, new_total) = update_handle.progress();
 
-						let new_total = NonZeroU64::new(new_total);
+						let new_total = std::num::NonZeroU64::new(new_total);
 						let did_total_change = core::mem::replace(&mut total, new_total) != new_total;
 
 						let new_status = if new_status != UpdateStatus::Invalid { Some(new_status) } else { None };
 						let did_status_change = core::mem::replace(&mut status, new_status) != new_status;
 
+						if did_status_change {
+							if let Some(new_status) = new_status {
+								progress_printer = None; // Reset progress printer so we can print
+								log::info!("{}", update_status_str(&new_status));
+							}
+						}
 						if did_status_change || did_total_change {
 							progress_printer = match (new_status, new_total) {
-								(Some(_), Some(new_total)) => Some(ProgressPrinter::new(new_total.get())),
+								(Some(_), Some(new_total)) => Some(crate::util::ProgressPrinter::new(new_total.get())),
 								_ => None,
 							};
 						}
@@ -150,10 +169,23 @@ fn workshop_upload(kind: PublishKind, addon: &Path, icon: Option<&Path>) -> Resu
 						if let Some(progress_printer) = &mut progress_printer {
 							progress_printer.set_progress(new_progress);
 						}
+					}
 
-						single.run_callbacks();
+					#[cfg(not(feature = "binary"))]
+					Err(std::sync::mpsc::RecvTimeoutError::Timeout) => {
+						let (new_status, _, _) = update_handle.progress();
+						let new_status = if new_status != UpdateStatus::Invalid { Some(new_status) } else { None };
+
+						let did_status_change = core::mem::replace(&mut status, new_status) != new_status;
+						if did_status_change {
+							if let Some(new_status) = new_status {
+								log::info!("{}", update_status_str(&new_status));
+							}
+						}
 					}
 				}
+
+				single.run_callbacks();
 			}
 		};
 

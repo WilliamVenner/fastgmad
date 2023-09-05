@@ -1,8 +1,13 @@
-use crate::PrintHelp;
 use std::path::PathBuf;
 
+/// Options for publishing a new addon to the Workshop
 pub struct WorkshopPublishConfig {
+	/// Path to the addon .GMA file
 	pub addon: PathBuf,
+
+	/// Path to the addon icon file
+	///
+	/// If `None`, a default will be provided by this library
 	pub icon: Option<PathBuf>,
 
 	#[cfg(feature = "binary")]
@@ -10,7 +15,9 @@ pub struct WorkshopPublishConfig {
 }
 impl WorkshopPublishConfig {
 	#[cfg(feature = "binary")]
-	pub fn from_args() -> Result<Self, PrintHelp> {
+	pub fn from_args() -> Result<Self, crate::util::PrintHelp> {
+		use crate::util::PrintHelp;
+
 		let mut config = Self {
 			addon: PathBuf::new(),
 			icon: None,
@@ -49,6 +56,7 @@ impl WorkshopPublishConfig {
 	}
 }
 
+/// Options for updating an existing addon on the Workshop
 pub struct WorkshopUpdateConfig {
 	/// The Workshop ID of the addon to update
 	pub id: u64,
@@ -69,7 +77,9 @@ pub struct WorkshopUpdateConfig {
 }
 impl WorkshopUpdateConfig {
 	#[cfg(feature = "binary")]
-	pub fn from_args() -> Result<Self, PrintHelp> {
+	pub fn from_args() -> Result<Self, crate::util::PrintHelp> {
+		use crate::util::PrintHelp;
+
 		let mut config = Self {
 			id: 0,
 			addon: PathBuf::new(),
