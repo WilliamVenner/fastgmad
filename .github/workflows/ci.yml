@@ -12,6 +12,8 @@ jobs:
   check:
     name: Check ${{ matrix.target }} ${{ matrix.release }} ${{ matrix.features }}
     runs-on: ubuntu-latest
+    env:
+      RUSTFLAGS: -D warnings
     strategy:
       matrix:
         target: ["--all", "--package fastgmad"]
@@ -25,11 +27,10 @@ jobs:
             features: "--all-features"
           - target: "--package fastgmad"
             features: "--all-features"
-
     steps:
     - uses: actions/checkout@v2
     - name: Check
-      run: cargo check ${{ matrix.release }} ${{ matrix.target }} ${{ matrix.features }} -- -D warnings
+      run: cargo check ${{ matrix.release }} ${{ matrix.target }} ${{ matrix.features }}
 
   check_fmt:
     runs-on: ubuntu-latest
