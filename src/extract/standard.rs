@@ -20,6 +20,8 @@ pub fn extract_gma_with_done_callback(
 
 	std::fs::create_dir_all(&conf.out)?;
 
+	eprintln!("Reading metadata...");
+
 	let mut buf = Vec::new();
 
 	{
@@ -69,37 +71,7 @@ pub fn extract_gma_with_done_callback(
 	// Addon version (unused)
 	r.read_exact(&mut [0u8; 4])?;
 
-	// File index
-	let mut file_index = Vec::new();
-	while r.read_u32::<LE>()? != 0 {
-		let path = {
-			buf.clear();
-			r.read_nul_str(&mut buf)?.to_vec()
-		};
-
-		let size = r.read_i64::<LE>()?;
-		let _crc = r.read_u32::<LE>()?;
-
-		if let Some(entry) = GmaEntry::try_new(&conf.out, path, size) {
-			file_index.push(entry);
-		}
-	}
-
-	// File contents
-	for GmaEntry { path, size } in file_index.iter() {
-		if let Some(parent) = path.parent() {
-			if parent != conf.out {
-				std::fs::create_dir_all(parent)?;
-			}
-		}
-
-		let mut take = r.take(*size);
-		let mut w = File::create(path)?;
-		std::io::copy(&mut take, &mut w)?;
-		w.flush()?;
-		r = take.into_inner();
-	}
-
+	eprintln!("Writing addon.json...");
 	let addon_json_path = conf.out.join("addon.json");
 	let mut addon_json_f = BufWriter::new(File::create(&addon_json_path)?);
 	if let Ok(mut kv) = serde_json::from_slice::<serde_json::Map<String, serde_json::Value>>(&addon_json) {
@@ -118,6 +90,39 @@ pub fn extract_gma_with_done_callback(
 		)?;
 	}
 	addon_json_f.flush()?;
+
+	// File index
+	eprintln!("Reading file list...");
+	let mut file_index = Vec::new();
+	while r.read_u32::<LE>()? != 0 {
+		let path = {
+			buf.clear();
+			r.read_nul_str(&mut buf)?.to_vec()
+		};
+
+		let size = r.read_i64::<LE>()?;
+		let _crc = r.read_u32::<LE>()?;
+
+		if let Some(entry) = GmaEntry::try_new(&conf.out, path, size) {
+			file_index.push(entry);
+		}
+	}
+
+	// File contents
+	eprintln!("Extracting file contents...");
+	for GmaEntry { path, size } in file_index.iter() {
+		if let Some(parent) = path.parent() {
+			if parent != conf.out {
+				std::fs::create_dir_all(parent)?;
+			}
+		}
+
+		let mut take = r.take(*size);
+		let mut w = File::create(path)?;
+		std::io::copy(&mut take, &mut w)?;
+		w.flush()?;
+		r = take.into_inner();
+	}
 
 	// Explicitly free memory here
 	// We may exit the process in done_callback (thereby allowing the OS to free the memory),

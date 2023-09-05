@@ -31,11 +31,17 @@ enum PublishKind<'a> {
 }
 fn workshop_upload(
 	kind: PublishKind,
-	mut metadata: GmaPublishingMetadata,
-	content_path: ContentPath,
+	addon: &Path,
 	icon: Option<&Path>,
 ) -> Result<PublishedFileId, anyhow::Error> {
+	eprintln!("Initializing Steam...");
 	let (client, single) = Client::init_app(4000)?;
+
+	eprintln!("Reading GMA metadata...");
+	let mut metadata = GmaPublishingMetadata::try_read(addon)?;
+
+	eprintln!("Preparing content folder...");
+	let content_path = ContentPath::new(addon)?;
 
 	macro_rules! run_steam_api {
 		($callback:ident => $code:expr) => {{
@@ -59,13 +65,17 @@ fn workshop_upload(
 	}
 
 	let (file_id, mut legal_agreement_pending) = match &kind {
-		PublishKind::Create => run_steam_api!(callback => client.ugc().create_item(GMOD_APPID, steamworks::FileType::Community, callback))?,
+		PublishKind::Create => {
+			eprintln!("Creating new Workshop item...");
+			run_steam_api!(callback => client.ugc().create_item(GMOD_APPID, steamworks::FileType::Community, callback))?
+		},
 		PublishKind::Update { id, .. } => (*id, false),
 	};
 
 	let icon = match icon {
 		Some(icon) => Cow::Borrowed(icon),
 		None => {
+			eprintln!("Preparing icon...");
 			let default_icon_path = std::env::temp_dir().join("fastgmad-publish/gmpublisher_default_icon.png");
 			std::fs::write(&default_icon_path, WORKSHOP_DEFAULT_ICON)?;
 			Cow::Owned(default_icon_path)
@@ -73,6 +83,7 @@ fn workshop_upload(
 	};
 
 	let res = (|| {
+		eprintln!("Preparing item upload...");
 		let mut item_update = client.ugc().start_item_update(GMOD_APPID, file_id);
 		// item_update = item_update.visibility(steamworks::PublishedFileVisibility::Private);
 
@@ -103,6 +114,7 @@ fn workshop_upload(
 		item_update = item_update.preview_path(&icon);
 		item_update = item_update.content_path(&content_path.0);
 
+		eprintln!("Uploading item...");
 		legal_agreement_pending |=
 			run_steam_api!(callback => item_update.submit(changes, callback)).map(|(_id, legal_agreement_pending)| legal_agreement_pending)?;
 
@@ -129,21 +141,16 @@ fn workshop_upload(
 }
 
 pub fn publish_gma(conf: &WorkshopPublishConfig) -> Result<PublishedFileId, anyhow::Error> {
-	let metadata = GmaPublishingMetadata::try_read(&conf.addon)?;
-	let content_path = ContentPath::new(&conf.addon)?;
-	workshop_upload(PublishKind::Create, metadata, content_path, conf.icon.as_deref())
+	workshop_upload(PublishKind::Create, &conf.addon, conf.icon.as_deref())
 }
 
 pub fn update_gma(conf: &WorkshopUpdateConfig) -> Result<(), anyhow::Error> {
-	let metadata = GmaPublishingMetadata::try_read(&conf.addon)?;
-	let content_path = ContentPath::new(&conf.addon)?;
 	workshop_upload(
 		PublishKind::Update {
 			id: PublishedFileId(conf.id),
 			changes: conf.changes.as_deref(),
 		},
-		metadata,
-		content_path,
+		&conf.addon,
 		conf.icon.as_deref(),
 	)
 	.map(|_| ())

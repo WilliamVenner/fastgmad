@@ -19,6 +19,8 @@ pub fn extract_gma_with_done_callback(conf: &ExtractGmadConfig, r: &mut impl Buf
 
 	let mut buf = Vec::new();
 
+	eprintln!("Reading metadata...");
+
 	{
 		let mut magic = [0u8; 4];
 		r.read_exact(&mut magic)?;
@@ -66,7 +68,28 @@ pub fn extract_gma_with_done_callback(conf: &ExtractGmadConfig, r: &mut impl Buf
 	// Addon version (unused)
 	r.read_exact(&mut [0u8; 4])?;
 
+	eprintln!("Writing addon.json...");
+	let addon_json_path = conf.out.join("addon.json");
+	let mut addon_json_f = BufWriter::new(File::create(&addon_json_path)?);
+	if let Ok(mut kv) = serde_json::from_slice::<serde_json::Map<String, serde_json::Value>>(&addon_json) {
+		// Add title key if it doesn't exist
+		if let serde_json::map::Entry::Vacant(v) = kv.entry("title".to_string()) {
+			v.insert(serde_json::Value::String(String::from_utf8_lossy(&title).into_owned()));
+		}
+		serde_json::to_writer_pretty(&mut addon_json_f, &kv)?;
+	} else {
+		serde_json::to_writer_pretty(
+			&mut addon_json_f,
+			&StubAddonJson {
+				title: String::from_utf8_lossy(&title),
+				description: String::from_utf8_lossy(&addon_json),
+			},
+		)?;
+	}
+	addon_json_f.flush()?;
+
 	// File index
+	eprintln!("Reading file list...");
 	let mut file_index: Vec<GmaEntry<usize>> = Vec::new();
 	while r.read_u32::<LE>()? != 0 {
 		let path = {
@@ -83,6 +106,7 @@ pub fn extract_gma_with_done_callback(conf: &ExtractGmadConfig, r: &mut impl Buf
 	}
 
 	// File contents
+	eprintln!("Extracting file contents...");
 	let memory_used = AtomicUsize::new(0);
 	let error = Mutex::new(None);
 	std::thread::scope(|s| {
@@ -158,25 +182,6 @@ pub fn extract_gma_with_done_callback(conf: &ExtractGmadConfig, r: &mut impl Buf
 	if let Some(err) = error.into_inner().unwrap() {
 		return Err(err);
 	}
-
-	let addon_json_path = conf.out.join("addon.json");
-	let mut addon_json_f = BufWriter::new(File::create(&addon_json_path)?);
-	if let Ok(mut kv) = serde_json::from_slice::<serde_json::Map<String, serde_json::Value>>(&addon_json) {
-		// Add title key if it doesn't exist
-		if let serde_json::map::Entry::Vacant(v) = kv.entry("title".to_string()) {
-			v.insert(serde_json::Value::String(String::from_utf8_lossy(&title).into_owned()));
-		}
-		serde_json::to_writer_pretty(&mut addon_json_f, &kv)?;
-	} else {
-		serde_json::to_writer_pretty(
-			&mut addon_json_f,
-			&StubAddonJson {
-				title: String::from_utf8_lossy(&title),
-				description: String::from_utf8_lossy(&addon_json),
-			},
-		)?;
-	}
-	addon_json_f.flush()?;
 
 	// Explicitly free memory here
 	// We may exit the process in done_callback (thereby allowing the OS to free the memory),

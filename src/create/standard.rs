@@ -12,8 +12,10 @@ struct GmaFileEntry {
 }
 
 pub fn create_gma_with_done_callback(conf: &CreateGmadConfig, w: &mut impl Write, done_callback: &mut dyn FnMut()) -> Result<(), anyhow::Error> {
+	eprintln!("Reading addon.json...");
 	let addon_json = AddonJson::read(&conf.folder.join("addon.json"))?;
 
+	eprintln!("Discovering entries...");
 	let mut entries = Vec::new();
 	for entry in walkdir::WalkDir::new(&conf.folder).follow_links(true).sort_by_file_name() {
 		let entry = entry?;
@@ -63,6 +65,8 @@ pub fn create_gma_with_done_callback(conf: &CreateGmadConfig, w: &mut impl Write
 		});
 	}
 
+	eprintln!("Writing GMA metadata...");
+
 	// Magic bytes
 	w.write_all(crate::GMA_MAGIC)?;
 
@@ -96,6 +100,7 @@ pub fn create_gma_with_done_callback(conf: &CreateGmadConfig, w: &mut impl Write
 	w.write_all(&[1, 0, 0, 0])?;
 
 	// File list
+	eprintln!("Writing file list...");
 	for (num, GmaFileEntry { size, relative_path, .. }) in entries.iter().enumerate() {
 		// File number
 		w.write_all(&u32::to_le_bytes(num as u32 + 1))?;
@@ -116,6 +121,7 @@ pub fn create_gma_with_done_callback(conf: &CreateGmadConfig, w: &mut impl Write
 	w.write_all(&[0u8; 4])?;
 
 	// Write entries
+	eprintln!("Writing file contents...");
 	for GmaFileEntry { path, .. } in entries.iter() {
 		std::io::copy(&mut File::open(path)?, w)?;
 	}

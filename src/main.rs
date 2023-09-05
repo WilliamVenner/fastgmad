@@ -192,6 +192,7 @@ fn publish(conf: WorkshopPublishConfig) -> Result<(), FastGmadBinError> {
 }
 
 fn update(conf: WorkshopUpdateConfig) -> Result<(), FastGmadBinError> {
+	eprintln!(">> You are UPDATING the Workshop item https://steamcommunity.com/sharedfiles/filedetails/?id={} <<\n", conf.id);
 	fastgmad::workshop::update_gma(&conf)?;
 	println!("{}", conf.id);
 	eprintln!("\nUpdated https://steamcommunity.com/sharedfiles/filedetails/?id={}", conf.id);
