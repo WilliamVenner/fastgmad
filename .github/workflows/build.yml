@@ -40,7 +40,7 @@ jobs:
         RUSTFLAGS: -Ctarget-feature=+crt-static
     - name: Zip
       run: |
-        7z a -tzip -mx=9 target/release/fastgmad_windows.zip ./target/release/fastgmad.exe ./target/release/fastgmad_publish.dll ./steam_api_sdk/redistributable_bin/win64/steam_api64.dll
+        7z a -tzip -mx=9 target/release/fastgmad_windows.zip ./target/release/fastgmad.exe ./target/release/fastgmad.pdb ./target/release/fastgmad_publish.dll ./target/release/fastgmad_publish.pdb ./steam_api_sdk/redistributable_bin/win64/steam_api64.dll
     - name: Release
       uses: softprops/action-gh-release@v1
       with:
