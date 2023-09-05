@@ -4,12 +4,17 @@ use std::path::PathBuf;
 pub struct WorkshopPublishConfig {
 	pub addon: PathBuf,
 	pub icon: Option<PathBuf>,
+
+	#[cfg(feature = "binary")]
+	pub noprogress: bool,
 }
 impl WorkshopPublishConfig {
+	#[cfg(feature = "binary")]
 	pub fn from_args() -> Result<Self, PrintHelp> {
 		let mut config = Self {
 			addon: PathBuf::new(),
 			icon: None,
+			noprogress: false,
 		};
 
 		let mut args = std::env::args_os().skip(2);
@@ -32,6 +37,10 @@ impl WorkshopPublishConfig {
 						.ok_or(PrintHelp(Some("Expected a value after -addon")))?;
 				}
 
+				"-noprogress" => {
+					config.noprogress = true;
+				}
+
 				_ => return Err(PrintHelp(Some("Unknown publishing argument"))),
 			}
 		}
@@ -45,14 +54,19 @@ pub struct WorkshopUpdateConfig {
 	pub addon: PathBuf,
 	pub icon: Option<PathBuf>,
 	pub changes: Option<String>,
+
+	#[cfg(feature = "binary")]
+	pub noprogress: bool,
 }
 impl WorkshopUpdateConfig {
+	#[cfg(feature = "binary")]
 	pub fn from_args() -> Result<Self, PrintHelp> {
 		let mut config = Self {
 			id: 0,
 			addon: PathBuf::new(),
 			icon: None,
 			changes: None,
+			noprogress: false,
 		};
 
 		let mut args = std::env::args_os().skip(2);
@@ -94,6 +108,10 @@ impl WorkshopUpdateConfig {
 							.ok_or(PrintHelp(Some("-changes was not valid UTF-8")))?
 							.to_owned(),
 					);
+				}
+
+				"-noprogress" => {
+					config.noprogress = true;
 				}
 
 				_ => return Err(PrintHelp(Some("Unknown publishing argument"))),

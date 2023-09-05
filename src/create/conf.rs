@@ -1,4 +1,3 @@
-use crate::util::PrintHelp;
 use std::{num::NonZeroUsize, path::PathBuf};
 
 macro_rules! nonzero {
@@ -10,22 +9,24 @@ macro_rules! nonzero {
 	};
 }
 
-pub enum CreateGmadOut {
-	Stdout,
-	File(PathBuf),
-}
-
 #[derive(Debug)]
 pub struct CreateGmadConfig {
 	pub folder: PathBuf,
 	pub warn_invalid: bool,
 	pub max_io_threads: NonZeroUsize,
 	pub max_io_memory_usage: NonZeroUsize,
+
+	#[cfg(feature = "binary")]
+	pub noprogress: bool,
 }
 impl CreateGmadConfig {
-	pub fn from_args() -> Result<(Self, CreateGmadOut), PrintHelp> {
+	#[cfg(feature = "binary")]
+	pub fn from_args() -> Result<(Self, CreateGmadOut), crate::util::PrintHelp> {
+		use crate::util::PrintHelp;
+
 		let mut config = Self::default();
 		let mut out = None;
+
 		let mut args = std::env::args_os().skip(2);
 		while let Some(arg) = args.next() {
 			match arg.to_str().ok_or(PrintHelp(Some("Unknown GMAD creation argument")))? {
@@ -65,9 +66,13 @@ impl CreateGmadConfig {
 						.map(PathBuf::from)
 						.ok_or(PrintHelp(Some("Expected a value after -folder")))?;
 				}
+				"-noprogress" => {
+					config.noprogress = true;
+				}
 				_ => return Err(PrintHelp(Some("Unknown GMAD creation argument"))),
 			}
 		}
+
 		Ok((config, out.ok_or(PrintHelp(Some("Please provide an output path for GMAD creation")))?))
 	}
 }
@@ -78,6 +83,15 @@ impl Default for CreateGmadConfig {
 			warn_invalid: false,
 			max_io_threads: std::thread::available_parallelism().unwrap_or_else(|_| nonzero!(NonZeroUsize::new(1))),
 			max_io_memory_usage: nonzero!(NonZeroUsize::new(2147483648)), // 2 GiB
+
+			#[cfg(feature = "binary")]
+			noprogress: false,
 		}
 	}
+}
+
+#[cfg(feature = "binary")]
+pub enum CreateGmadOut {
+	Stdout,
+	File(PathBuf),
 }

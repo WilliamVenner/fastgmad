@@ -1,4 +1,3 @@
-use crate::util::PrintHelp;
 use std::{num::NonZeroUsize, path::PathBuf};
 
 macro_rules! nonzero {
@@ -10,19 +9,20 @@ macro_rules! nonzero {
 	};
 }
 
-pub enum ExtractGmadIn {
-	Stdin,
-	File(PathBuf),
-}
-
 #[derive(Debug)]
 pub struct ExtractGmadConfig {
 	pub out: PathBuf,
 	pub max_io_threads: NonZeroUsize,
 	pub max_io_memory_usage: NonZeroUsize,
+
+	#[cfg(feature = "binary")]
+	pub noprogress: bool,
 }
 impl ExtractGmadConfig {
-	pub fn from_args() -> Result<(Self, ExtractGmadIn), PrintHelp> {
+	#[cfg(feature = "binary")]
+	pub fn from_args() -> Result<(Self, ExtractGmadIn), crate::util::PrintHelp> {
+		use crate::util::PrintHelp;
+
 		let mut config = Self::default();
 		let mut r#in = None;
 		let mut args = std::env::args_os().skip(2);
@@ -62,6 +62,9 @@ impl ExtractGmadConfig {
 							.ok_or(PrintHelp(Some("Expected a value after -folder")))?,
 					));
 				}
+				"-noprogress" => {
+					config.noprogress = true;
+				}
 				_ => return Err(PrintHelp(Some("Unknown GMAD extraction argument"))),
 			}
 		}
@@ -74,6 +77,15 @@ impl Default for ExtractGmadConfig {
 			out: PathBuf::new(),
 			max_io_threads: std::thread::available_parallelism().unwrap_or_else(|_| nonzero!(NonZeroUsize::new(1))),
 			max_io_memory_usage: nonzero!(NonZeroUsize::new(2147483648)), // 2 GiB
+
+			#[cfg(feature = "binary")]
+			noprogress: false,
 		}
 	}
+}
+
+#[cfg(feature = "binary")]
+pub enum ExtractGmadIn {
+	Stdin,
+	File(PathBuf),
 }

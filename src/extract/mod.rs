@@ -7,7 +7,10 @@ pub mod parallel;
 pub mod standard;
 
 mod conf;
-pub use conf::{ExtractGmadConfig, ExtractGmadIn};
+pub use conf::ExtractGmadConfig;
+
+#[cfg(feature = "binary")]
+pub use conf::ExtractGmadIn;
 
 #[derive(serde::Serialize)]
 struct StubAddonJson<'a> {
@@ -27,7 +30,7 @@ where
 		let size = match Size::try_from(size) {
 			Ok(size) => size,
 			Err(_) => {
-				eprintln!("warning: skipping GMA entry with unsupported file size ({size} bytes): {path:?}");
+				log::warn!("Skipping GMA entry with unsupported file size ({size} bytes): {path:?}");
 				return None;
 			}
 		};
@@ -35,7 +38,7 @@ where
 		let path = match String::from_utf8(path) {
 			Ok(path) => path,
 			Err(err) => {
-				eprintln!(
+				log::info!(
 					"warning: skipping GMA entry with non-UTF-8 file path: {:?}",
 					String::from_utf8_lossy(err.as_bytes())
 				);
@@ -46,7 +49,7 @@ where
 		let path = {
 			let path = Path::new(&path);
 			if path.components().any(|c| matches!(c, Component::ParentDir | Component::Prefix(_))) {
-				eprintln!("warning: skipping GMA entry with invalid file path: {:?}", path);
+				log::warn!("Skipping GMA entry with invalid file path: {:?}", path);
 				return None;
 			}
 			base_path.join(path)

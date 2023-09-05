@@ -49,4 +49,58 @@ impl<R: BufRead> BufReadEx for R {
 	}
 }
 
-pub struct PrintHelp(pub Option<&'static str>);
+#[cfg(feature = "binary")]
+mod binary {
+	use super::*;
+
+	pub struct PrintHelp(pub Option<&'static str>);
+
+	pub struct ProgressPrinter {
+		stderr: std::io::StderrLock<'static>,
+		progress: u64,
+		progress_max: u64,
+		backspaces: usize,
+	}
+
+	impl ProgressPrinter {
+		const PROGRESS_BAR_LEN: usize = 30;
+
+		pub fn new(progress_max: u64, msg: &str) -> Self {
+			log::info!("{}", msg);
+
+			Self {
+				stderr: std::io::stderr().lock(),
+				progress_max,
+				progress: Default::default(),
+				backspaces: 0,
+			}
+		}
+
+		pub fn add_progress(&mut self, add: u64) {
+			self.progress += add;
+
+			let progress_pct = self.progress as f32 / self.progress_max as f32;
+
+			let filled = ((progress_pct * Self::PROGRESS_BAR_LEN as f32) as usize).min(Self::PROGRESS_BAR_LEN);
+			let outlined = Self::PROGRESS_BAR_LEN - filled;
+			let (filled, outlined) = ("▮".repeat(filled), "▯".repeat(outlined));
+
+			let progress_pct = format!("{filled}{outlined} {:.02}%", progress_pct * 100.0);
+			let backspaces = core::mem::replace(&mut self.backspaces, progress_pct.len());
+			self.stderr.write_all("\u{8}".repeat(backspaces).as_bytes()).ok();
+			self.stderr.write_all(progress_pct.as_bytes()).ok();
+			self.stderr.flush().ok();
+		}
+	}
+
+	impl Drop for ProgressPrinter {
+		fn drop(&mut self) {
+			self.stderr.write_all("\u{8}".repeat(self.backspaces).as_bytes()).ok();
+			self.stderr.write_all(" ".repeat(self.backspaces).as_bytes()).ok();
+			self.stderr.write_all("\u{8}".repeat(self.backspaces).as_bytes()).ok();
+			self.stderr.flush().ok();
+		}
+	}
+}
+#[cfg(feature = "binary")]
+pub use binary::*;

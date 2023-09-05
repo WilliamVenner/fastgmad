@@ -4,7 +4,10 @@ pub mod parallel;
 pub mod standard;
 
 mod conf;
-pub use conf::{CreateGmadConfig, CreateGmadOut};
+pub use conf::CreateGmadConfig;
+
+#[cfg(feature = "binary")]
+pub use conf::CreateGmadOut;
 
 #[derive(serde::Deserialize)]
 struct AddonJson {

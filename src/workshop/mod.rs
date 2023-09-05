@@ -34,13 +34,13 @@ fn workshop_upload(
 	addon: &Path,
 	icon: Option<&Path>,
 ) -> Result<PublishedFileId, anyhow::Error> {
-	eprintln!("Initializing Steam...");
+	log::info!("Initializing Steam...");
 	let (client, single) = Client::init_app(4000)?;
 
-	eprintln!("Reading GMA metadata...");
+	log::info!("Reading GMA metadata...");
 	let mut metadata = GmaPublishingMetadata::try_read(addon)?;
 
-	eprintln!("Preparing content folder...");
+	log::info!("Preparing content folder...");
 	let content_path = ContentPath::new(addon)?;
 
 	macro_rules! run_steam_api {
@@ -66,7 +66,7 @@ fn workshop_upload(
 
 	let (file_id, mut legal_agreement_pending) = match &kind {
 		PublishKind::Create => {
-			eprintln!("Creating new Workshop item...");
+			log::info!("Creating new Workshop item...");
 			run_steam_api!(callback => client.ugc().create_item(GMOD_APPID, steamworks::FileType::Community, callback))?
 		},
 		PublishKind::Update { id, .. } => (*id, false),
@@ -75,7 +75,7 @@ fn workshop_upload(
 	let icon = match icon {
 		Some(icon) => Cow::Borrowed(icon),
 		None => {
-			eprintln!("Preparing icon...");
+			log::info!("Preparing icon...");
 			let default_icon_path = std::env::temp_dir().join("fastgmad-publish/gmpublisher_default_icon.png");
 			std::fs::write(&default_icon_path, WORKSHOP_DEFAULT_ICON)?;
 			Cow::Owned(default_icon_path)
@@ -83,7 +83,7 @@ fn workshop_upload(
 	};
 
 	let res = (|| {
-		eprintln!("Preparing item upload...");
+		log::info!("Preparing item upload...");
 		let mut item_update = client.ugc().start_item_update(GMOD_APPID, file_id);
 		// item_update = item_update.visibility(steamworks::PublishedFileVisibility::Private);
 
@@ -114,7 +114,7 @@ fn workshop_upload(
 		item_update = item_update.preview_path(&icon);
 		item_update = item_update.content_path(&content_path.0);
 
-		eprintln!("Uploading item...");
+		log::info!("Uploading item...");
 		legal_agreement_pending |=
 			run_steam_api!(callback => item_update.submit(changes, callback)).map(|(_id, legal_agreement_pending)| legal_agreement_pending)?;
 
@@ -124,7 +124,7 @@ fn workshop_upload(
 	})();
 
 	if legal_agreement_pending {
-		eprintln!("\n{}\n", LEGAL_AGREEMENT_MESSAGE.trim());
+		log::info!("\n{}\n", LEGAL_AGREEMENT_MESSAGE.trim());
 	}
 
 	res.map(|_| file_id).map_err(|err| {
@@ -173,7 +173,7 @@ impl ContentPath {
 				let res = std::os::windows::fs::symlink_file(&temp_gma_path, gma_path);
 				match &res {
 					Err(res) if res.kind() == std::io::ErrorKind::PermissionDenied => {
-						eprintln!("warning: copying .gma to temporary directory for publishing. To skip this in future, run as administrator so that fastgmad can create symlinks.");
+						log::warn!("Copying .gma to temporary directory for publishing. To skip this in future, run as administrator so that fastgmad can create symlinks.");
 					}
 					_ => {}
 				}
@@ -225,7 +225,7 @@ impl GmaPublishingMetadata {
 
 		let version = r.read_u8()?;
 		if version != GMA_VERSION {
-			eprintln!("warning: file is in GMA version {version}, expected version {GMA_VERSION}, reading anyway...");
+			log::warn!("File is in GMA version {version}, expected version {GMA_VERSION}, reading anyway...");
 		}
 
 		// SteamID (unused)

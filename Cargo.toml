@@ -13,7 +13,8 @@ lto = "thin"
 codegen-units = 1
 
 [features]
-default = ["workshop"]
+default = []
+binary = []
 workshop = ["dep:steamworks"]
 
 [lib]
@@ -23,7 +24,7 @@ bench = false
 name = "fastgmad"
 path = "src/main.rs"
 bench = false
-required-features = ["workshop"]
+required-features = ["binary", "workshop"]
 
 [[bench]]
 name = "create_gma_benchmark"
@@ -38,6 +39,8 @@ memchr = "2"
 byteorder = "1"
 steamworks = { version = "0.9", optional = true }
 uuid = { version = "1", features = ["v4"] }
+log = "0.4"
+pretty_env_logger = "0.5"
 
 [dev-dependencies]
 lazy_static = "1"

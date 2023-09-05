@@ -14,6 +14,7 @@ pub mod whitelist;
 #[cfg(feature = "workshop")]
 pub mod workshop;
 
+#[cfg(feature = "binary")]
 pub use util::PrintHelp;
 
 // TODO error struct with file path context and stuff

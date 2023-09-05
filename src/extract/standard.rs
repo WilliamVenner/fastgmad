@@ -15,12 +15,12 @@ pub fn extract_gma_with_done_callback(
 	done_callback: &mut dyn FnMut(),
 ) -> Result<(), anyhow::Error> {
 	if conf.out.is_dir() {
-		eprintln!("warning: output directory already exists; files not present in this GMA but present in the existing output directory will not be deleted");
+		log::warn!("Output directory already exists; files not present in this GMA but present in the existing output directory will NOT be deleted");
 	}
 
 	std::fs::create_dir_all(&conf.out)?;
 
-	eprintln!("Reading metadata...");
+	log::info!("Reading metadata...");
 
 	let mut buf = Vec::new();
 
@@ -34,7 +34,7 @@ pub fn extract_gma_with_done_callback(
 
 	let version = r.read_u8()?;
 	if version != GMA_VERSION {
-		eprintln!("warning: file is in GMA version {version}, expected version {GMA_VERSION}, reading anyway...");
+		log::warn!("File is in GMA version {version}, expected version {GMA_VERSION}, reading anyway...");
 	}
 
 	// SteamID (unused)
@@ -71,7 +71,7 @@ pub fn extract_gma_with_done_callback(
 	// Addon version (unused)
 	r.read_exact(&mut [0u8; 4])?;
 
-	eprintln!("Writing addon.json...");
+	log::info!("Writing addon.json...");
 	let addon_json_path = conf.out.join("addon.json");
 	let mut addon_json_f = BufWriter::new(File::create(&addon_json_path)?);
 	if let Ok(mut kv) = serde_json::from_slice::<serde_json::Map<String, serde_json::Value>>(&addon_json) {
@@ -92,7 +92,11 @@ pub fn extract_gma_with_done_callback(
 	addon_json_f.flush()?;
 
 	// File index
-	eprintln!("Reading file list...");
+	log::info!("Reading file list...");
+
+	#[cfg(feature = "binary")]
+	let mut total_size = 0;
+
 	let mut file_index = Vec::new();
 	while r.read_u32::<LE>()? != 0 {
 		let path = {
@@ -104,24 +108,35 @@ pub fn extract_gma_with_done_callback(
 		let _crc = r.read_u32::<LE>()?;
 
 		if let Some(entry) = GmaEntry::try_new(&conf.out, path, size) {
+			#[cfg(feature = "binary")] {
+				total_size += entry.size;
+			}
+
 			file_index.push(entry);
 		}
 	}
 
 	// File contents
-	eprintln!("Extracting file contents...");
-	for GmaEntry { path, size } in file_index.iter() {
-		if let Some(parent) = path.parent() {
-			if parent != conf.out {
-				std::fs::create_dir_all(parent)?;
-			}
-		}
+	{
+		#[cfg(feature = "binary")]
+		let mut progress = crate::util::ProgressPrinter::new(total_size, "Extracting file contents...");
 
-		let mut take = r.take(*size);
-		let mut w = File::create(path)?;
-		std::io::copy(&mut take, &mut w)?;
-		w.flush()?;
-		r = take.into_inner();
+		for GmaEntry { path, size } in file_index.iter() {
+			if let Some(parent) = path.parent() {
+				if parent != conf.out {
+					std::fs::create_dir_all(parent)?;
+				}
+			}
+
+			let mut take = r.take(*size);
+			let mut w = File::create(path)?;
+			std::io::copy(&mut take, &mut w)?;
+			w.flush()?;
+			r = take.into_inner();
+
+			#[cfg(feature = "binary")]
+			progress.add_progress(*size);
+		}
 	}
 
 	// Explicitly free memory here

@@ -36,6 +36,7 @@ Additional flags
 -max-io-threads <integer> - The maximum number of threads to use for reading and writing files. Defaults to the number of logical cores on the system.
 -max-io-memory-usage <integer> - The maximum amount of memory to use for reading and writing files in parallel. Defaults to 2 GiB.
 -warninvalid - Warns rather than errors if the GMA contains invalid files. Off by default.
+-noprogress - Turns off progress bars.
 
 Notes
 -----
@@ -52,29 +53,61 @@ use fastgmad::{
 use std::{
 	ffi::OsStr,
 	fs::File,
-	io::{BufReader, BufWriter},
+	io::{BufReader, BufWriter, Write},
 	path::{Path, PathBuf},
 	time::Instant,
 };
 
 fn main() {
+	log::set_boxed_logger({
+		log::set_max_level(log::LevelFilter::Info);
+
+		struct Logger(Instant);
+		impl log::Log for Logger {
+			fn enabled(&self, metadata: &log::Metadata) -> bool {
+				metadata.level() <= log::Level::Info
+			}
+
+			fn log(&self, record: &log::Record) {
+				let level = match record.level() {
+					log::Level::Info => {
+						eprintln!("[+{:?}] {}", self.0.elapsed(), record.args());
+						return;
+					},
+					log::Level::Warn => "WARN: ",
+					log::Level::Error => "ERROR: ",
+					log::Level::Debug => "DEBUG: ",
+					log::Level::Trace => "TRACE: ",
+				};
+				eprintln!("{level}{}", record.args());
+			}
+
+			fn flush(&self) {
+				std::io::stderr().lock().flush().ok();
+			}
+		}
+		Box::new(Logger(Instant::now()))
+	})
+	.unwrap();
+
 	eprintln!(concat!(
 		"fastgmad v",
 		env!("CARGO_PKG_VERSION"),
 		" by Billy\nhttps://github.com/WilliamVenner/fastgmad\n",
 		"Prefer to use a GUI? Check out https://github.com/WilliamVenner/gmpublisher\n"
 	));
+
 	match bin() {
 		Ok(()) => {}
 
 		Err(FastGmadBinError::Error(err)) => {
-			eprintln!("{err:#?}\n");
+			log::error!("{err:#?}\n");
 			Err::<(), _>(err).unwrap();
 		}
 
 		Err(FastGmadBinError::PrintHelp(msg)) => {
 			if let Some(msg) = msg {
-				eprintln!("{msg}\n");
+				log::error!("{msg}\n");
 			}
 
 			eprintln!("{}", HELP.trim());
@@ -83,9 +116,8 @@ fn main() {
 }
 
 fn bin() -> Result<(), FastGmadBinError> {
-	let start = Instant::now();
 	let mut exit = || {
-		eprintln!("Finished in {:?}", start.elapsed());
+		log::info!("Finished");
 		std::process::exit(0);
 	};
 
@@ -152,7 +184,7 @@ fn create(conf: CreateGmadConfig, out: CreateGmadOut, exit: &mut impl FnMut()) -
 		CreateGmadOut::Stdout => {
 			let mut w = std::io::stdout().lock();
 			if conf.max_io_threads.get() != 1 {
-				eprintln!("warning: writing to stdout cannot take advantage of multithreading; ignoring -max-io-threads");
+				log::warn!("Writing to stdout cannot take advantage of multithreading; ignoring -max-io-threads");
 			}
 
 			fastgmad::create::standard::create_gma_with_done_callback(&conf, &mut w, exit)?;
@@ -187,15 +219,18 @@ fn extract(conf: ExtractGmadConfig, r#in: ExtractGmadIn, exit: &mut impl FnMut()
 fn publish(conf: WorkshopPublishConfig) -> Result<(), FastGmadBinError> {
 	let id = fastgmad::workshop::publish_gma(&conf)?;
 	println!("{}", id.0);
-	eprintln!("\nPublished to https://steamcommunity.com/sharedfiles/filedetails/?id={}", id.0);
+	log::info!("\nPublished to https://steamcommunity.com/sharedfiles/filedetails/?id={}", id.0);
 	Ok(())
 }
 
 fn update(conf: WorkshopUpdateConfig) -> Result<(), FastGmadBinError> {
-	eprintln!(">> You are UPDATING the Workshop item https://steamcommunity.com/sharedfiles/filedetails/?id={} <<\n", conf.id);
+	log::info!(
+		">> You are UPDATING the Workshop item https://steamcommunity.com/sharedfiles/filedetails/?id={} <<\n",
+		conf.id
+	);
 	fastgmad::workshop::update_gma(&conf)?;
 	println!("{}", conf.id);
-	eprintln!("\nUpdated https://steamcommunity.com/sharedfiles/filedetails/?id={}", conf.id);
+	log::info!("\nUpdated https://steamcommunity.com/sharedfiles/filedetails/?id={}", conf.id);
 	Ok(())
 }
 
