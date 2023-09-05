@@ -84,6 +84,8 @@ impl Drop for CreatedItem {
 	}
 }
 
+// TODO ctrlc ContentFolder
+
 impl PublishStateInterface for Rc<PublishState> {
 	fn create_item(&self) -> Result<Box<dyn CreatedItemInterface>, PublishError> {
 		run_steam_api!(callback => self.single => self.client.ugc().create_item(GMOD_APP_ID, steamworks::FileType::Community, callback))

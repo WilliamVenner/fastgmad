@@ -66,6 +66,7 @@ mod ctrlc_handling {
 						exit_ctrlc();
 					} else {
 						state.pressed = true;
+						eprintln!();
 						log::warn!("Aborting, please wait...");
 					}
 				})
@@ -387,7 +388,7 @@ impl ContentPath {
 		let symlink_result = {
 			#[cfg(windows)]
 			{
-				let res = std::os::windows::fs::symlink_file(&temp_gma_path, gma_path);
+				let res = std::os::windows::fs::symlink_file(gma_path, &temp_gma_path);
 				match &res {
 					Err(res) if res.kind() == std::io::ErrorKind::PermissionDenied => {
 						log::warn!("Copying .gma to temporary directory for publishing. To skip this in future, run as administrator so that fastgmad can create symlinks.");
@@ -398,7 +399,7 @@ impl ContentPath {
 			}
 			#[cfg(unix)]
 			{
-				std::os::unix::fs::symlink(&temp_gma_path, gma_path)
+				std::os::unix::fs::symlink(gma_path, &temp_gma_path)
 			}
 			#[cfg(not(any(windows, unix)))]
 			{

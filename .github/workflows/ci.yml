@@ -29,7 +29,7 @@ jobs:
     steps:
     - uses: actions/checkout@v2
     - name: Check
-      run: cargo check ${{ matrix.release }} ${{ matrix.target }} ${{ matrix.features }}
+      run: cargo check ${{ matrix.release }} ${{ matrix.target }} ${{ matrix.features }} -- -D warnings
 
   check_fmt:
     runs-on: ubuntu-latest
