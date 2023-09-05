@@ -1,8 +1,8 @@
 use fastgmad::{
+	bin_prelude::*,
 	create::{CreateGmaConfig, CreateGmadOut},
 	extract::{ExtractGmaConfig, ExtractGmadIn},
 	workshop::{WorkshopPublishConfig, WorkshopUpdateConfig},
-	bin_prelude::*,
 };
 use std::{
 	ffi::OsStr,
@@ -79,7 +79,9 @@ fn main() {
 				log::error!("Make sure these shared libraries are present in the same directory & dynamic linker search path as fastgmad, otherwise Workshop publishing will not work");
 			} else if cfg!(target_os = "macos") {
 				log::error!("fastgmad comes with two additional shared libraries: libsteam_api.dylib and libfastgmad_publish.dylib");
-				log::error!("Make sure these shared libraries are present in the same directory as fastgmad, otherwise Workshop publishing will not work");
+				log::error!(
+					"Make sure these shared libraries are present in the same directory as fastgmad, otherwise Workshop publishing will not work"
+				);
 			} else {
 				log::error!("fastgmad comes with two additional shared libraries");
 				log::error!("Make sure these shared libraries are present in the same directory & dynamic linker search path as fastgmad, otherwise Workshop publishing will not work");

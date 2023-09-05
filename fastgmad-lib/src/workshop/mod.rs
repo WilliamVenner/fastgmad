@@ -26,7 +26,7 @@ use std::{
 	fs::File,
 	io::{BufReader, Read},
 	path::Path,
-	path::PathBuf
+	path::PathBuf,
 };
 use uuid::Uuid;
 
@@ -39,9 +39,17 @@ Once you have accepted the agreement, you can set the visiblity of your addon to
 #[cfg(feature = "binary")]
 fn init_steam() -> Result<Box<dyn PublishStateInterface>, anyhow::Error> {
 	unsafe {
-		let lib = Box::leak(Box::new(libloading::Library::new(if cfg!(windows) { "fastgmad_publish" } else { "libfastgmad_publish" })?));
-		let fastgmad_publish_init: fn() -> Result<*mut dyn PublishStateInterface, fastgmad_publish::shared::PublishError> = *lib.get(b"fastgmad_publish_init")?;
+		let lib = Box::leak(Box::new(libloading::Library::new(if cfg!(windows) {
+			"fastgmad_publish"
+		} else {
+			"libfastgmad_publish"
+		})?));
+
+		let fastgmad_publish_init: fn() -> Result<*mut dyn PublishStateInterface, fastgmad_publish::shared::PublishError> =
+			*lib.get(b"fastgmad_publish_init")?;
+
 		let interface = fastgmad_publish_init()?;
+
 		Ok(Box::from_raw(interface) as Box<dyn PublishStateInterface>)
 	}
 }
@@ -176,7 +184,11 @@ fn workshop_upload(kind: PublishKind, addon: &Path, icon: Option<&Path>) -> Resu
 
 			#[cfg(not(feature = "binary"))]
 			let progress_callback = move |new_status, _new_progress, _new_total| {
-				let new_status = if new_status != ItemUpdateStatus::Invalid { Some(new_status) } else { None };
+				let new_status = if new_status != ItemUpdateStatus::Invalid {
+					Some(new_status)
+				} else {
+					None
+				};
 
 				let did_status_change = core::mem::replace(&mut status, new_status) != new_status;
 				if did_status_change {
