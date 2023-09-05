@@ -1,4 +1,4 @@
-//! Fast gmad and gmpublisher implementation
+//! Fast gmad and gmpublish implementation
 
 #![cfg_attr(not(feature = "binary"), warn(missing_docs))]
 
