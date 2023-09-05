@@ -223,6 +223,20 @@ impl<W: Write + Seek> CreateGma<W> for ParallelCreateGma {
 			.iter()
 			.partition::<Vec<_>, _>(|entry| entry.size <= conf.max_io_memory_usage.get() as u64);
 
+		struct EntriesQueue<'a> {
+			head: AtomicUsize,
+			entries: Vec<&'a GmaFileEntry>,
+			memory_usage: Mutex<usize>,
+			memory_usage_cvar: Condvar,
+		}
+		impl EntriesQueue<'_> {
+			pub fn next(&self) -> Option<&GmaFileEntry> {
+				// NOTE: technically this can wrap around on overflow, but it won't happen because
+				// we only spawn a maximum of MAX_IO_THREADS.
+				self.entries.get(self.head.fetch_add(1, std::sync::atomic::Ordering::SeqCst)).copied()
+			}
+		}
+
 		let queue = Arc::new(EntriesQueue {
 			entries: buffered_entries,
 			head: AtomicUsize::new(0),
@@ -348,18 +362,4 @@ struct GmaFileEntry {
 	relative_path: String,
 	size: u64,
 	offset: u64,
-}
-
-struct EntriesQueue<'a> {
-	head: AtomicUsize,
-	entries: Vec<&'a GmaFileEntry>,
-	memory_usage: Mutex<usize>,
-	memory_usage_cvar: Condvar,
-}
-impl EntriesQueue<'_> {
-	pub fn next(&self) -> Option<&GmaFileEntry> {
-		// NOTE: technically this can wrap around on overflow, but it won't happen because
-		// we only spawn a maximum of MAX_IO_THREADS.
-		self.entries.get(self.head.fetch_add(1, std::sync::atomic::Ordering::SeqCst)).copied()
-	}
 }
