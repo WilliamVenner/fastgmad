@@ -16,18 +16,10 @@ default = []
 binary = []
 workshop = ["dep:steamworks"]
 
-[lib]
-bench = false
-
 [[bin]]
 name = "fastgmad"
 path = "src/main.rs"
-bench = false
 required-features = ["binary", "workshop"]
-
-[[bench]]
-name = "create_gma_benchmark"
-harness = false
 
 [dependencies]
 walkdir = "2"
@@ -39,8 +31,6 @@ byteorder = "1"
 steamworks = { version = "0.9", optional = true }
 uuid = { version = "1", features = ["v4"] }
 log = "0.4"
-pretty_env_logger = "0.5"
 
 [dev-dependencies]
 lazy_static = "1"
-criterion = "0.5"

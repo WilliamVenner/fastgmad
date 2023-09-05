@@ -13,7 +13,7 @@ use std::{
 };
 
 fn main() {
-	log::set_boxed_logger({
+	log::set_logger({
 		log::set_max_level(log::LevelFilter::Info);
 
 		struct Logger(Instant);
@@ -40,7 +40,7 @@ fn main() {
 				std::io::stderr().lock().flush().ok();
 			}
 		}
-		Box::new(Logger(Instant::now()))
+		Box::leak(Box::new(Logger(Instant::now())))
 	})
 	.unwrap();
 

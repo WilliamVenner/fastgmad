@@ -1,3 +1,5 @@
+// TODO
+
 mod fastgmad {
 	pub(super) use crate::*;
 }
@@ -34,16 +36,17 @@ macro_rules! create_gma_tests {
 		$(
 			#[test]
 			fn $standard() {
-				let mut config = CreateGmadConfig::default();
+				let mut config = CreateGmaConfig::default();
 				config.folder = PathBuf::from($addon);
-				fastgmad::create::standard::create_gma(&config, &mut temp_gma_file()).unwrap();
+				config.max_io_threads = NonZeroUsize::new(1).unwrap();
+				fastgmad::create::seekable_create_gma(&config, &mut temp_gma_file()).unwrap();
 			}
 
 			#[test]
 			fn $parallel() {
-				let mut config = CreateGmadConfig::default();
+				let mut config = CreateGmaConfig::default();
 				config.folder = PathBuf::from($addon);
-				fastgmad::create::parallel::create_gma(&config, &mut temp_gma_file()).unwrap();
+				fastgmad::create::seekable_create_gma(&config, &mut temp_gma_file()).unwrap();
 			}
 		)*
 	};
@@ -71,7 +74,7 @@ macro_rules! extract_gma_tests {
 		$(
 			#[test]
 			fn $standard() {
-				let mut config = ExtractGmadConfig::default();
+				let mut config = ExtractGmaConfig::default();
 				config.out = PathBuf::from(EXTRACT_GMA_TEMP_DIR.join(Uuid::new_v4().to_string()));
 				config.max_io_threads = NonZeroUsize::new(1).unwrap();
 				fastgmad::extract::extract_gma(&config, &mut BufReader::new(File::open($addon).unwrap())).unwrap();
@@ -79,7 +82,7 @@ macro_rules! extract_gma_tests {
 
 			#[test]
 			fn $parallel() {
-				let mut config = ExtractGmadConfig::default();
+				let mut config = ExtractGmaConfig::default();
 				config.out = PathBuf::from(EXTRACT_GMA_TEMP_DIR.join(Uuid::new_v4().to_string()));
 				fastgmad::extract::extract_gma(&config, &mut BufReader::new(File::open($addon).unwrap())).unwrap();
 			}
