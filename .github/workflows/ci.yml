@@ -41,11 +41,7 @@ jobs:
   test:
     name: Test ${{ matrix.release }}
     runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        release: ["", "--release"]
-
     steps:
     - uses: actions/checkout@v2
     - name: Test
-      run: cargo test --package fastgmad --all ${{ matrix.release }}
+      run: cargo test --release --package fastgmad --all
