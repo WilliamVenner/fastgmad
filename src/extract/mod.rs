@@ -164,7 +164,6 @@ trait ExtractGma {
 
 struct StandardExtractGma;
 impl ExtractGma for StandardExtractGma {
-	#[inline]
 	fn write_entries(
 		conf: &ExtractGmaConfig,
 		mut r: &mut impl BufRead,
@@ -197,7 +196,6 @@ impl ExtractGma for StandardExtractGma {
 
 struct ParallelExtractGma;
 impl ExtractGma for ParallelExtractGma {
-	#[inline]
 	fn write_entries(
 		conf: &ExtractGmaConfig,
 		r: &mut impl BufRead,
