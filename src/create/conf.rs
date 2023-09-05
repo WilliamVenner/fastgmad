@@ -10,7 +10,7 @@ macro_rules! nonzero {
 }
 
 #[derive(Debug)]
-pub struct CreateGmadConfig {
+pub struct CreateGmaConfig {
 	pub folder: PathBuf,
 	pub warn_invalid: bool,
 	pub max_io_threads: NonZeroUsize,
@@ -19,7 +19,7 @@ pub struct CreateGmadConfig {
 	#[cfg(feature = "binary")]
 	pub noprogress: bool,
 }
-impl CreateGmadConfig {
+impl CreateGmaConfig {
 	#[cfg(feature = "binary")]
 	pub fn from_args() -> Result<(Self, CreateGmadOut), crate::util::PrintHelp> {
 		use crate::util::PrintHelp;
@@ -76,7 +76,7 @@ impl CreateGmadConfig {
 		Ok((config, out.ok_or(PrintHelp(Some("Please provide an output path for GMAD creation")))?))
 	}
 }
-impl Default for CreateGmadConfig {
+impl Default for CreateGmaConfig {
 	fn default() -> Self {
 		Self {
 			folder: PathBuf::new(),

@@ -10,7 +10,7 @@ macro_rules! nonzero {
 }
 
 #[derive(Debug)]
-pub struct ExtractGmadConfig {
+pub struct ExtractGmaConfig {
 	pub out: PathBuf,
 	pub max_io_threads: NonZeroUsize,
 	pub max_io_memory_usage: NonZeroUsize,
@@ -18,7 +18,7 @@ pub struct ExtractGmadConfig {
 	#[cfg(feature = "binary")]
 	pub noprogress: bool,
 }
-impl ExtractGmadConfig {
+impl ExtractGmaConfig {
 	#[cfg(feature = "binary")]
 	pub fn from_args() -> Result<(Self, ExtractGmadIn), crate::util::PrintHelp> {
 		use crate::util::PrintHelp;
@@ -71,7 +71,7 @@ impl ExtractGmadConfig {
 		Ok((config, r#in.ok_or(PrintHelp(Some("Please provide an output path")))?))
 	}
 }
-impl Default for ExtractGmadConfig {
+impl Default for ExtractGmaConfig {
 	fn default() -> Self {
 		Self {
 			out: PathBuf::new(),

@@ -45,8 +45,8 @@ Notes
 );
 
 use fastgmad::{
-	create::{CreateGmadConfig, CreateGmadOut},
-	extract::{ExtractGmadConfig, ExtractGmadIn},
+	create::{CreateGmaConfig, CreateGmadOut},
+	extract::{ExtractGmaConfig, ExtractGmadIn},
 	workshop::{WorkshopPublishConfig, WorkshopUpdateConfig},
 	PrintHelp,
 };
@@ -73,7 +73,7 @@ fn main() {
 					log::Level::Info => {
 						eprintln!("[+{:?}] {}", self.0.elapsed(), record.args());
 						return;
-					},
+					}
 					log::Level::Warn => "WARN: ",
 					log::Level::Error => "ERROR: ",
 					log::Level::Debug => "DEBUG: ",
@@ -131,7 +131,7 @@ fn bin() -> Result<(), FastGmadBinError> {
 		// Create a GMA from it
 		let out = path.with_extension("gma");
 		create(
-			CreateGmadConfig {
+			CreateGmaConfig {
 				folder: PathBuf::from(cmd),
 				..Default::default()
 			},
@@ -142,7 +142,7 @@ fn bin() -> Result<(), FastGmadBinError> {
 		// The first argument is a path to a GMA
 		// Extract it
 		extract(
-			ExtractGmadConfig {
+			ExtractGmaConfig {
 				out: path.with_extension(""),
 				..Default::default()
 			},
@@ -152,12 +152,12 @@ fn bin() -> Result<(), FastGmadBinError> {
 	} else {
 		match cmd.to_str() {
 			Some("create") => {
-				let (conf, out) = CreateGmadConfig::from_args()?;
+				let (conf, out) = CreateGmaConfig::from_args()?;
 				create(conf, out, &mut exit)
 			}
 
 			Some("extract") => {
-				let (conf, r#in) = ExtractGmadConfig::from_args()?;
+				let (conf, r#in) = ExtractGmaConfig::from_args()?;
 				extract(conf, r#in, &mut exit)
 			}
 
@@ -170,15 +170,11 @@ fn bin() -> Result<(), FastGmadBinError> {
 	}
 }
 
-fn create(conf: CreateGmadConfig, out: CreateGmadOut, exit: &mut impl FnMut()) -> Result<(), FastGmadBinError> {
+fn create(conf: CreateGmaConfig, out: CreateGmadOut, exit: &mut impl FnMut()) -> Result<(), FastGmadBinError> {
 	match out {
 		CreateGmadOut::File(path) => {
 			let mut w = BufWriter::new(File::create(path)?);
-			if conf.max_io_threads.get() == 1 {
-				fastgmad::create::standard::create_gma_with_done_callback(&conf, &mut w, exit)?;
-			} else {
-				fastgmad::create::parallel::create_gma_with_done_callback(&conf, &mut w, exit)?;
-			}
+			fastgmad::create::seekable_create_gma_with_done_callback(&conf, &mut w, exit)?;
 		}
 
 		CreateGmadOut::Stdout => {
@@ -187,30 +183,22 @@ fn create(conf: CreateGmadConfig, out: CreateGmadOut, exit: &mut impl FnMut()) -
 				log::warn!("Writing to stdout cannot take advantage of multithreading; ignoring -max-io-threads");
 			}
 
-			fastgmad::create::standard::create_gma_with_done_callback(&conf, &mut w, exit)?;
+			fastgmad::create::create_gma_with_done_callback(&conf, &mut w, exit)?;
 		}
 	}
 	Ok(())
 }
 
-fn extract(conf: ExtractGmadConfig, r#in: ExtractGmadIn, exit: &mut impl FnMut()) -> Result<(), FastGmadBinError> {
+fn extract(conf: ExtractGmaConfig, r#in: ExtractGmadIn, exit: &mut impl FnMut()) -> Result<(), FastGmadBinError> {
 	match r#in {
 		ExtractGmadIn::File(path) => {
 			let mut r = BufReader::new(File::open(path)?);
-			if conf.max_io_threads.get() == 1 {
-				fastgmad::extract::standard::extract_gma_with_done_callback(&conf, &mut r, exit)?;
-			} else {
-				fastgmad::extract::parallel::extract_gma_with_done_callback(&conf, &mut r, exit)?;
-			}
+			fastgmad::extract::extract_gma_with_done_callback(&conf, &mut r, exit)?;
 		}
 
 		ExtractGmadIn::Stdin => {
 			let mut r = std::io::stdin().lock();
-			if conf.max_io_threads.get() == 1 {
-				fastgmad::extract::standard::extract_gma_with_done_callback(&conf, &mut r, exit)?;
-			} else {
-				fastgmad::extract::parallel::extract_gma_with_done_callback(&conf, &mut r, exit)?;
-			}
+			fastgmad::extract::extract_gma_with_done_callback(&conf, &mut r, exit)?;
 		}
 	}
 	Ok(())

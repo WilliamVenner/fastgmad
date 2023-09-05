@@ -28,7 +28,7 @@ fn criterion_benchmark(c: &mut Criterion) {
 	let temp_file = || BufWriter::new(File::create(temp_file_path()).unwrap());
 
 	for (group_name, addon_dir) in [("Create Wiremod GMA", wiremod_dir), ("Create CS2 Weapon Props GMA", cs2weaponprops_dir)] {
-		let conf = Box::leak(Box::new(fastgmad::create::CreateGmadConfig::default()));
+		let conf = Box::leak(Box::new(fastgmad::create::CreateGmaConfig::default()));
 		conf.folder = PathBuf::from(addon_dir);
 
 		let mut group = c.benchmark_group(group_name);

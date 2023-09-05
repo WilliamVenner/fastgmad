@@ -2,11 +2,12 @@ mod fastgmad {
 	pub(super) use crate::*;
 }
 
-use fastgmad::{create::CreateGmadConfig, extract::ExtractGmadConfig};
+use fastgmad::{create::CreateGmaConfig, extract::ExtractGmaConfig};
 use lazy_static::lazy_static;
 use std::{
 	fs::File,
 	io::{BufReader, BufWriter},
+	num::NonZeroUsize,
 	path::{Path, PathBuf},
 };
 use uuid::Uuid;
@@ -72,14 +73,15 @@ macro_rules! extract_gma_tests {
 			fn $standard() {
 				let mut config = ExtractGmadConfig::default();
 				config.out = PathBuf::from(EXTRACT_GMA_TEMP_DIR.join(Uuid::new_v4().to_string()));
-				fastgmad::extract::standard::extract_gma(&config, &mut BufReader::new(File::open($addon).unwrap())).unwrap();
+				config.max_io_threads = NonZeroUsize::new(1).unwrap();
+				fastgmad::extract::extract_gma(&config, &mut BufReader::new(File::open($addon).unwrap())).unwrap();
 			}
 
 			#[test]
 			fn $parallel() {
 				let mut config = ExtractGmadConfig::default();
 				config.out = PathBuf::from(EXTRACT_GMA_TEMP_DIR.join(Uuid::new_v4().to_string()));
-				fastgmad::extract::parallel::extract_gma(&config, &mut BufReader::new(File::open($addon).unwrap())).unwrap();
+				fastgmad::extract::extract_gma(&config, &mut BufReader::new(File::open($addon).unwrap())).unwrap();
 			}
 		)*
 	};
