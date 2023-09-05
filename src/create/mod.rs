@@ -146,6 +146,8 @@ trait CreateGma<W: Write> {
 
 		// File list
 		log::info!("Writing file list...");
+
+		let mut total_size = 0;
 		for (num, GmaFileEntry { size, relative_path, .. }) in entries.iter().enumerate() {
 			// File number
 			w.write_all(&u32::to_le_bytes(num as u32 + 1))?;
@@ -160,6 +162,8 @@ trait CreateGma<W: Write> {
 
 			// CRC (unused)
 			w.write_all(&[0u8; 4])?;
+
+			total_size += *size;
 		}
 
 		// Zero to signify end of files
@@ -167,9 +171,8 @@ trait CreateGma<W: Write> {
 
 		// Write entries
 		log::info!("Writing file contents...");
-		for GmaFileEntry { path, .. } in entries.iter() {
-			std::io::copy(&mut File::open(path)?, w)?;
-		}
+
+		Self::write_entries(conf, w, total_size, &entries)?;
 
 		// Explicitly free memory here
 		// We may exit the process in done_callback (thereby allowing the OS to free the memory),
@@ -219,8 +222,6 @@ impl<W: Write + Seek> CreateGma<W> for ParallelCreateGma {
 		#[cfg(feature = "binary")] total_size: u64,
 		entries: &[GmaFileEntry],
 	) -> Result<(), anyhow::Error> {
-		log::info!("Writing file contents...");
-
 		#[cfg(feature = "binary")]
 		let mut progress = crate::util::ProgressPrinter::new(total_size);
 
@@ -284,18 +285,21 @@ impl<W: Write + Seek> CreateGma<W> for ParallelCreateGma {
 									})
 									.unwrap();
 
+								let bytes_left = max_offset - cur_offset;
+								let offset = cur_offset;
+
 								let res = {
 									let available_memory = (conf.max_io_memory_usage.get() - *memory_usage) as u64;
-									if available_memory >= *size {
-										*memory_usage += *size as usize;
+									if available_memory >= bytes_left {
+										*memory_usage += bytes_left as usize;
 										drop(memory_usage);
 
-										cur_offset += *size;
+										cur_offset += bytes_left;
 
-										let mut buf = Vec::with_capacity(*size as usize);
+										let mut buf = Vec::with_capacity(bytes_left as usize);
 										f.read_to_end(&mut buf).map(|_| buf)
 									} else {
-										let will_read = available_memory.min(max_offset - cur_offset);
+										let will_read = available_memory.min(bytes_left);
 
 										*memory_usage += will_read as usize;
 										drop(memory_usage);
@@ -307,7 +311,7 @@ impl<W: Write + Seek> CreateGma<W> for ParallelCreateGma {
 									}
 								};
 
-								if tx.send(res.map(|contents| (cur_offset, contents))).is_err() {
+								if tx.send(res.map(|contents| (offset, contents))).is_err() {
 									return;
 								}
 							}
@@ -338,9 +342,12 @@ impl<W: Write + Seek> CreateGma<W> for ParallelCreateGma {
 			Ok::<_, anyhow::Error>(())
 		})?;
 
-		for GmaFileEntry { path, offset, .. } in full_copy_entries.iter() {
-			w.seek(SeekFrom::Start(contents_ptr + *offset))?;
-			std::io::copy(&mut File::open(path)?, w)?;
+		for entry in full_copy_entries.iter() {
+			w.seek(SeekFrom::Start(contents_ptr + entry.offset))?;
+			std::io::copy(&mut File::open(&entry.path)?, w)?;
+
+			#[cfg(feature = "binary")]
+			progress.add_progress(entry.size);
 		}
 
 		w.flush()?;
