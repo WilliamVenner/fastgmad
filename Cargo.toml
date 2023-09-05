@@ -10,6 +10,7 @@ repository = "https://github.com/WilliamVenner/fastgmad"
 [profile.release]
 lto = "thin"
 codegen-units = 1
+strip = "debuginfo"
 
 [features]
 binary = []
