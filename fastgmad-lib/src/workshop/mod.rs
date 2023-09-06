@@ -12,7 +12,11 @@ mod fastgmad_publish {
 }
 use fastgmad_publish::shared::{CompletedItemUpdate, ItemUpdate, ItemUpdateStatus, PublishStateInterface};
 
-use crate::{util::BufReadEx, GMA_MAGIC, GMA_VERSION};
+use crate::{
+	error::{fastgmad_error, fastgmad_io_error, FastGmadError},
+	util::BufReadEx,
+	GMA_MAGIC, GMA_VERSION,
+};
 use byteorder::ReadBytesExt;
 use std::{
 	borrow::Cow,
@@ -97,28 +101,33 @@ Once you have accepted the agreement, you can set the visiblity of your addon to
 "#;
 
 #[cfg(feature = "binary")]
-fn init_steam() -> Result<Box<dyn PublishStateInterface>, anyhow::Error> {
+fn init_steam() -> Result<Box<dyn PublishStateInterface>, FastGmadError> {
 	unsafe {
-		let lib = Box::leak(Box::new(libloading::Library::new(if cfg!(target_os = "linux") {
-			"libfastgmad_publish.so"
-		} else if cfg!(target_os = "macos") {
-			"libfastgmad_publish.dylib"
-		} else {
-			"fastgmad_publish"
-		})?));
+		let lib = Box::leak(Box::new(
+			libloading::Library::new(if cfg!(target_os = "linux") {
+				"libfastgmad_publish.so"
+			} else if cfg!(target_os = "macos") {
+				"libfastgmad_publish.dylib"
+			} else {
+				"fastgmad_publish"
+			})
+			.map_err(|err| fastgmad_error!(error: Libloading(err)))?,
+		));
 
 		let fastgmad_publish_init: fn() -> Result<*mut dyn PublishStateInterface, fastgmad_publish::shared::PublishError> =
-			*lib.get(b"fastgmad_publish_init")?;
+			*lib.get(b"fastgmad_publish_init").map_err(|err| fastgmad_error!(error: Libloading(err)))?;
 
-		let interface = fastgmad_publish_init()?;
+		let interface = fastgmad_publish_init().map_err(|err| fastgmad_error!(while "initializing Steam", error: SteamError(err.to_string())))?;
 
 		Ok(Box::from_raw(interface) as Box<dyn PublishStateInterface>)
 	}
 }
 
 #[cfg(not(feature = "binary"))]
-fn init_steam() -> Result<Box<dyn PublishStateInterface>, anyhow::Error> {
-	Ok(Box::new(std::rc::Rc::new(fastgmad_publish::PublishState::new()?)) as Box<dyn PublishStateInterface>)
+fn init_steam() -> Result<Box<dyn PublishStateInterface>, FastGmadError> {
+	Ok(Box::new(std::rc::Rc::new(
+		fastgmad_publish::PublishState::new().map_err(|err| fastgmad_error!(while "initializing Steam", error: SteamError(err.to_string())))?,
+	)) as Box<dyn PublishStateInterface>)
 }
 
 #[derive(Clone, Copy)]
@@ -126,24 +135,20 @@ enum PublishKind<'a> {
 	Create,
 	Update { id: u64, changes: Option<&'a str> },
 }
-fn workshop_upload(#[cfg(feature = "binary")] noprogress: bool, kind: PublishKind, addon: &Path, icon: Option<&Path>) -> Result<u64, anyhow::Error> {
+fn workshop_upload(#[cfg(feature = "binary")] noprogress: bool, kind: PublishKind, addon: &Path, icon: Option<&Path>) -> Result<u64, FastGmadError> {
 	// For some reason we need to manually check the icon file size
 	// Steam just hangs forever if the icon is invalid
 	if let Some(icon) = icon {
 		log::info!("Checking icon...");
 
 		let icon_size = std::fs::metadata(icon)
-			.map_err(|err| anyhow::anyhow!("Failed to read icon: {err}"))?
+			.map_err(|error| fastgmad_io_error!(while "reading icon metadata", error: error))?
 			.len();
 
 		if icon_size < WORKSHOP_ICON_MIN_SIZE {
-			return Err(anyhow::anyhow!(
-				"Icon is too small ({icon_size} bytes), must be at least {WORKSHOP_ICON_MAX_SIZE} bytes"
-			));
+			return Err(fastgmad_error!(error: IconTooSmall));
 		} else if icon_size > WORKSHOP_ICON_MAX_SIZE {
-			return Err(anyhow::anyhow!(
-				"Icon is too large ({icon_size} bytes), must be at most {WORKSHOP_ICON_MAX_SIZE} bytes"
-			));
+			return Err(fastgmad_error!(error: IconTooLarge));
 		}
 	}
 
@@ -166,7 +171,9 @@ fn workshop_upload(#[cfg(feature = "binary")] noprogress: bool, kind: PublishKin
 			#[cfg(feature = "binary")]
 			let ctrlc_handle = ctrlc_handling::CtrlCHandle::get();
 
-			let mut created = steam.create_item()?;
+			let mut created = steam
+				.create_item()
+				.map_err(|error| fastgmad_error!(error: SteamError(error.to_string())))?;
 
 			#[cfg(feature = "binary")]
 			{
@@ -205,7 +212,8 @@ fn workshop_upload(#[cfg(feature = "binary")] noprogress: bool, kind: PublishKin
 		(None, PublishKind::Create) => {
 			log::info!("Preparing icon...");
 			let default_icon_path = std::env::temp_dir().join("fastgmad-publish/gmpublisher_default_icon.png");
-			std::fs::write(&default_icon_path, WORKSHOP_DEFAULT_ICON)?;
+			std::fs::write(&default_icon_path, WORKSHOP_DEFAULT_ICON)
+				.map_err(|error| fastgmad_io_error!(while "writing default icon", error: error))?;
 			Some(Cow::Owned(default_icon_path))
 		}
 
@@ -327,7 +335,9 @@ fn workshop_upload(#[cfg(feature = "binary")] noprogress: bool, kind: PublishKin
 			steam.start_item_update(details, &mut tick_callback, &mut progress_callback)
 		};
 
-		legal_agreement_pending |= res.map(|CompletedItemUpdate { legal_agreement_pending }| legal_agreement_pending)?;
+		legal_agreement_pending |= res
+			.map(|CompletedItemUpdate { legal_agreement_pending }| legal_agreement_pending)
+			.map_err(|error| fastgmad_error!(error: SteamError(error.to_string())))?;
 
 		// Everything OK!
 		// Make sure we don't delete the newly created item
@@ -337,7 +347,7 @@ fn workshop_upload(#[cfg(feature = "binary")] noprogress: bool, kind: PublishKin
 
 		drop(content_path);
 
-		Ok::<_, anyhow::Error>(file_id)
+		Ok::<_, FastGmadError>(file_id)
 	})();
 
 	if legal_agreement_pending {
@@ -348,7 +358,7 @@ fn workshop_upload(#[cfg(feature = "binary")] noprogress: bool, kind: PublishKin
 }
 
 /// Publishes a GMA to the Steam Workshop
-pub fn publish_gma(conf: &WorkshopPublishConfig) -> Result<u64, anyhow::Error> {
+pub fn publish_gma(conf: &WorkshopPublishConfig) -> Result<u64, FastGmadError> {
 	workshop_upload(
 		#[cfg(feature = "binary")]
 		conf.noprogress,
@@ -359,7 +369,7 @@ pub fn publish_gma(conf: &WorkshopPublishConfig) -> Result<u64, anyhow::Error> {
 }
 
 /// Updates a GMA on the Steam Workshop
-pub fn update_gma(conf: &WorkshopUpdateConfig) -> Result<(), anyhow::Error> {
+pub fn update_gma(conf: &WorkshopUpdateConfig) -> Result<(), FastGmadError> {
 	workshop_upload(
 		#[cfg(feature = "binary")]
 		conf.noprogress,
@@ -375,10 +385,10 @@ pub fn update_gma(conf: &WorkshopUpdateConfig) -> Result<(), anyhow::Error> {
 
 struct ContentPath(PathBuf);
 impl ContentPath {
-	fn new(gma_path: &Path) -> Result<Self, anyhow::Error> {
+	fn new(gma_path: &Path) -> Result<Self, FastGmadError> {
 		let dir = std::env::temp_dir().join(format!("fastgmad-publish/{}", Uuid::new_v4()));
 
-		std::fs::create_dir_all(&dir)?;
+		std::fs::create_dir_all(&dir).map_err(|error| fastgmad_io_error!(while "creating content path directory", error: error, path: dir))?;
 
 		let temp_gma_path = dir.join("fastgmad.gma");
 
@@ -400,12 +410,16 @@ impl ContentPath {
 			}
 			#[cfg(not(any(windows, unix)))]
 			{
-				Err(std::io::Error::new(std::io::ErrorKind::Other, "Unsupported platform"))
+				Err(FastGmadError::IoError(std::io::Error::new(
+					std::io::ErrorKind::Other,
+					"Unsupported platform",
+				)))
 			}
 		};
 
 		if symlink_result.is_err() {
-			std::fs::copy(gma_path, temp_gma_path)?;
+			std::fs::copy(gma_path, &temp_gma_path)
+				.map_err(|error| fastgmad_io_error!(while "copying .gma to temporary directory", error: error, paths: (gma_path, temp_gma_path)))?;
 		}
 
 		Ok(Self(dir))
@@ -425,36 +439,62 @@ struct GmaPublishingMetadata {
 	description: Option<String>,
 }
 impl GmaPublishingMetadata {
-	fn try_read(path: &Path) -> Result<Self, anyhow::Error> {
+	fn try_read(path: &Path) -> Result<Self, FastGmadError> {
 		let mut metadata = Self::default();
 
-		let mut r = BufReader::new(File::open(path)?);
+		let mut r = BufReader::new(File::open(path).map_err(|error| fastgmad_io_error!(while "opening GMA file", error: error, path: path))?);
 
 		{
 			let mut magic = [0u8; 4];
-			r.read_exact(&mut magic)?;
+			let res = r.read_exact(&mut magic);
+			if let Err(error) = res {
+				if error.kind() != std::io::ErrorKind::UnexpectedEof {
+					return Err(fastgmad_io_error!(while "reading GMA magic bytes", error: error));
+				}
+			}
 			if magic != GMA_MAGIC {
-				return Err(std::io::Error::new(std::io::ErrorKind::InvalidData, "File is not in GMA format").into());
+				return Err(fastgmad_io_error!(error: std::io::Error::new(std::io::ErrorKind::InvalidData, "File is not in GMA format")));
 			}
 		}
 
-		let version = r.read_u8()?;
+		let version = r.read_u8().map_err(|error| {
+			fastgmad_io_error!(
+				while "reading version byte",
+				error: error
+			)
+		})?;
 		if version != GMA_VERSION {
 			log::warn!("File is in GMA version {version}, expected version {GMA_VERSION}, reading anyway...");
 		}
 
 		// SteamID (unused)
-		r.read_exact(&mut [0u8; 8])?;
+		r.read_exact(&mut [0u8; 8]).map_err(|error| {
+			fastgmad_io_error!(
+				while "reading SteamID",
+				error: error
+			)
+		})?;
 
 		// Timestamp
-		r.read_exact(&mut [0u8; 8])?;
+		r.read_exact(&mut [0u8; 8]).map_err(|error| {
+			fastgmad_io_error!(
+				while "reading timestamp",
+				error: error
+			)
+		})?;
 
 		if version > 1 {
 			// Required content
 			let mut buf = Vec::new();
 			loop {
 				buf.clear();
-				if r.read_nul_str(&mut buf)?.is_empty() {
+				let content = r.read_nul_str(&mut buf).map_err(|error| {
+					fastgmad_io_error!(
+						while "reading required content",
+						error: error
+					)
+				})?;
+				if content.is_empty() {
 					break;
 				}
 			}
@@ -463,19 +503,34 @@ impl GmaPublishingMetadata {
 		// Addon name
 		metadata.title = {
 			let mut buf = Vec::new();
-			r.read_nul_str(&mut buf)?;
+			r.read_nul_str(&mut buf).map_err(|error| {
+				fastgmad_io_error!(
+					while "reading addon name",
+					error: error
+				)
+			})?;
 
 			if buf.last() == Some(&0) {
 				buf.pop();
 			}
 
-			String::from_utf8(buf)?
+			String::from_utf8(buf).map_err(|error| {
+				fastgmad_io_error!(
+					while "decoding addon name",
+					error: std::io::Error::new(std::io::ErrorKind::InvalidData, error)
+				)
+			})?
 		};
 
 		// addon.json
 		{
 			let mut buf = Vec::new();
-			r.read_nul_str(&mut buf)?;
+			r.read_nul_str(&mut buf).map_err(|error| {
+				fastgmad_io_error!(
+					while "reading addon description",
+					error: error
+				)
+			})?;
 
 			if buf.last() == Some(&0) {
 				buf.pop();
@@ -492,7 +547,9 @@ impl GmaPublishingMetadata {
 				metadata.tags = addon_json.tags;
 				metadata.addon_type = addon_json.r#type;
 			} else {
-				metadata.description = Some(String::from_utf8(buf)?);
+				metadata.description = Some(String::from_utf8(buf).map_err(
+					|error| fastgmad_io_error!(while "decoding addon description", error: std::io::Error::new(std::io::ErrorKind::InvalidData, error)),
+				)?);
 			}
 		};
 

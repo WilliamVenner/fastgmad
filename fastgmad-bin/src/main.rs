@@ -1,6 +1,7 @@
 use fastgmad::{
 	bin_prelude::*,
 	create::{CreateGmaConfig, CreateGmadOut},
+	error::{FastGmadError, FastGmadErrorKind},
 	extract::{ExtractGmaConfig, ExtractGmadIn},
 	workshop::{WorkshopPublishConfig, WorkshopUpdateConfig},
 };
@@ -54,21 +55,10 @@ fn main() {
 	match bin() {
 		Ok(()) => {}
 
-		Err(FastGmadBinError::Error(err)) => {
-			eprintln!();
-			log::error!("{err:#?}\n");
-			Err::<(), _>(err).unwrap();
-		}
-
-		Err(FastGmadBinError::PrintHelp(msg)) => {
-			if let Some(msg) = msg {
-				log::error!("{msg}\n");
-			}
-
-			eprintln!("{}", include_str!("usage.txt"));
-		}
-
-		Err(FastGmadBinError::Libloading(err)) => {
+		Err(FastGmadBinError::FastGmadError(FastGmadError {
+			kind: FastGmadErrorKind::Libloading(err),
+			..
+		})) => {
 			eprintln!();
 			log::error!("Error loading shared libraries for Workshop publishing: {err}");
 			if cfg!(target_os = "windows") {
@@ -89,6 +79,20 @@ fn main() {
 			log::error!("Additionally, it is not recommended to install fastgmad in the bin directory of Garry's Mod, as Garry's Mod itself may use a different version of the Steam API and updates can break this");
 			eprintln!();
 			Err(err).unwrap()
+		}
+
+		Err(FastGmadBinError::FastGmadError(err)) => {
+			eprintln!();
+			log::error!("{err}\n");
+			Err::<(), _>(err).unwrap();
+		}
+
+		Err(FastGmadBinError::PrintHelp(msg)) => {
+			if let Some(msg) = msg {
+				log::error!("{msg}\n");
+			}
+
+			eprintln!("{}", include_str!("usage.txt"));
 		}
 	}
 }
@@ -152,7 +156,10 @@ fn create(conf: CreateGmaConfig, out: CreateGmadOut, exit: &mut impl FnMut()) ->
 	match out {
 		CreateGmadOut::File(path) => {
 			log::info!("Opening output file...");
-			let mut w = BufWriter::new(File::create(path)?);
+			let mut w = BufWriter::new(File::create(&path).map_err(|error| FastGmadError {
+				kind: FastGmadErrorKind::PathIoError { path, error },
+				context: Some("opening output file".to_string()),
+			})?);
 			fastgmad::create::seekable_create_gma_with_done_callback(&conf, &mut w, exit)?;
 		}
 
@@ -172,7 +179,10 @@ fn extract(conf: ExtractGmaConfig, r#in: ExtractGmadIn, exit: &mut impl FnMut())
 	match r#in {
 		ExtractGmadIn::File(path) => {
 			log::info!("Opening input file...");
-			let mut r = BufReader::new(File::open(path)?);
+			let mut r = BufReader::new(File::open(&path).map_err(|error| FastGmadError {
+				kind: FastGmadErrorKind::PathIoError { path, error },
+				context: Some("opening input file".to_string()),
+			})?);
 			fastgmad::extract::extract_gma_with_done_callback(&conf, &mut r, exit)?;
 		}
 
@@ -203,22 +213,12 @@ fn update(conf: WorkshopUpdateConfig) -> Result<(), FastGmadBinError> {
 }
 
 enum FastGmadBinError {
+	FastGmadError(FastGmadError),
 	PrintHelp(Option<&'static str>),
-	Error(anyhow::Error),
-	Libloading(libloading::Error),
 }
-impl From<anyhow::Error> for FastGmadBinError {
-	fn from(e: anyhow::Error) -> Self {
-		match e.downcast::<libloading::Error>() {
-			Ok(e) => Self::Libloading(e),
-			Err(e) => Self::Error(e),
-		}
-	}
-}
-impl From<std::io::Error> for FastGmadBinError {
-	#[track_caller]
-	fn from(e: std::io::Error) -> Self {
-		Self::Error(e.into())
+impl From<FastGmadError> for FastGmadBinError {
+	fn from(e: FastGmadError) -> Self {
+		Self::FastGmadError(e)
 	}
 }
 impl From<PrintHelp> for FastGmadBinError {
