@@ -45,11 +45,7 @@ trait ExtractGma {
 		}
 
 		std::fs::create_dir_all(&conf.out).map_err(|error| {
-			fastgmad_io_error!(
-				while "creating output directory",
-				error: error,
-				path: conf.out
-			)
+			fastgmad_io_error!(while "creating output directory",error: error,path: conf.out)
 		})?;
 
 		log::info!("Reading metadata...");
@@ -70,30 +66,19 @@ trait ExtractGma {
 		}
 
 		let version = r.read_u8().map_err(|error| {
-			fastgmad_io_error!(
-				while "reading version byte",
-				error: error
-			)
+			fastgmad_io_error!(while "reading version byte", error: error)
 		})?;
 		if version != GMA_VERSION {
 			log::warn!("File is in GMA version {version}, expected version {GMA_VERSION}, reading anyway...");
 		}
 
 		// SteamID (unused)
-		r.read_exact(&mut [0u8; 8]).map_err(|error| {
-			fastgmad_io_error!(
-				while "reading SteamID",
-				error: error
-			)
-		})?;
+		r.read_exact(&mut [0u8; 8])
+			.map_err(|error| fastgmad_io_error!(while "reading SteamID", error: error))?;
 
 		// Timestamp
-		r.read_exact(&mut [0u8; 8]).map_err(|error| {
-			fastgmad_io_error!(
-				while "reading timestamp",
-				error: error
-			)
-		})?;
+		r.read_exact(&mut [0u8; 8])
+			.map_err(|error| fastgmad_io_error!(while "reading timestamp", error: error))?;
 
 		if version > 1 {
 			// Required content

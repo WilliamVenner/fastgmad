@@ -23,7 +23,7 @@ pub use conf::CreateGmadOut;
 ///
 /// Prefer [`seekable_create_gma`] if your writer type implements [`std::io::Seek`], as it supports parallel I/O.
 pub fn create_gma(conf: &CreateGmaConfig, w: &mut impl Write) -> Result<(), FastGmadError> {
-	StandardCreateGma::create_gma_with_done_callback(w, conf, &mut || ())
+	StandardCreateGma::create_gma_with_done_callback(conf, w, &mut || ())
 }
 
 /// Creates a GMA file from a directory.
@@ -31,15 +31,15 @@ pub fn create_gma(conf: &CreateGmaConfig, w: &mut impl Write) -> Result<(), Fast
 /// Prefer this function over [`create_gma`] if your writer type implements [`std::io::Seek`], as this function supports parallel I/O.
 pub fn seekable_create_gma(conf: &CreateGmaConfig, w: &mut (impl Write + Seek)) -> Result<(), FastGmadError> {
 	if conf.max_io_threads.get() == 1 {
-		StandardCreateGma::create_gma_with_done_callback(w, conf, &mut || ())
+		StandardCreateGma::create_gma_with_done_callback(conf, w, &mut || ())
 	} else {
-		ParallelCreateGma::create_gma_with_done_callback(w, conf, &mut || ())
+		ParallelCreateGma::create_gma_with_done_callback(conf, w, &mut || ())
 	}
 }
 
 #[cfg(feature = "binary")]
 pub fn create_gma_with_done_callback(conf: &CreateGmaConfig, w: &mut impl Write, done_callback: &mut dyn FnMut()) -> Result<(), FastGmadError> {
-	StandardCreateGma::create_gma_with_done_callback(w, conf, done_callback)
+	StandardCreateGma::create_gma_with_done_callback(conf, w, done_callback)
 }
 
 #[cfg(feature = "binary")]
@@ -49,76 +49,19 @@ pub fn seekable_create_gma_with_done_callback(
 	done_callback: &mut dyn FnMut(),
 ) -> Result<(), FastGmadError> {
 	if conf.max_io_threads.get() == 1 {
-		StandardCreateGma::create_gma_with_done_callback(w, conf, done_callback)
+		StandardCreateGma::create_gma_with_done_callback(conf, w, done_callback)
 	} else {
-		ParallelCreateGma::create_gma_with_done_callback(w, conf, done_callback)
+		ParallelCreateGma::create_gma_with_done_callback(conf, w, done_callback)
 	}
 }
 
 trait CreateGma<W: Write> {
-	fn create_gma_with_done_callback(w: &mut W, conf: &CreateGmaConfig, done_callback: &mut dyn FnMut()) -> Result<(), FastGmadError> {
+	fn create_gma_with_done_callback(conf: &CreateGmaConfig, w: &mut W, done_callback: &mut dyn FnMut()) -> Result<(), FastGmadError> {
 		log::info!("Reading addon.json...");
 		let addon_json = AddonJson::read(&conf.folder.join("addon.json"))?;
 
 		log::info!("Discovering entries...");
-		let mut entries = Vec::new();
-		let mut prev_offset = 0;
-		for entry in walkdir::WalkDir::new(&conf.folder).follow_links(true).sort_by_file_name() {
-			let entry = entry.map_err(|error| {
-				let path = error.path().unwrap_or(&conf.folder).to_owned();
-				if let Some(io_error) = error.into_io_error() {
-					fastgmad_io_error!(while "walking directory", error: io_error, path: path)
-				} else {
-					fastgmad_io_error!(while "walking directory", error: std::io::Error::new(std::io::ErrorKind::Other, "unknown"), path: path)
-				}
-			})?;
-			if !entry.file_type().is_file() {
-				continue;
-			}
-
-			let path = entry.path();
-			let relative_path = path
-				.strip_prefix(&conf.folder)
-				.map_err(
-					|_| fastgmad_io_error!(error: std::io::Error::new(std::io::ErrorKind::InvalidData, "File not in addon directory"), path: path),
-				)?
-				.to_str()
-				.ok_or_else(
-					|| fastgmad_io_error!(error: std::io::Error::new(std::io::ErrorKind::InvalidData, "File path not valid UTF-8"), path: path),
-				)?
-				.replace('\\', "/");
-
-			if relative_path == "addon.json" {
-				continue;
-			}
-
-			if whitelist::is_ignored(&relative_path, &addon_json.ignore) {
-				continue;
-			}
-
-			if !whitelist::check(&relative_path) {
-				if conf.warn_invalid {
-					log::warn!(
-						"File {} not in GMA whitelist - see https://wiki.facepunch.com/gmod/Workshop_Addon_Creation",
-						relative_path
-					);
-					continue;
-				} else {
-					return Err(fastgmad_error!(error: EntryNotWhitelisted(relative_path)));
-				}
-			}
-
-			let size = std::fs::metadata(path)
-				.map_err(|error| fastgmad_io_error!(while "reading entry metadata", error: error, path: path))?
-				.len();
-			let new_offset = prev_offset + size;
-			entries.push(GmaFileEntry {
-				path: path.to_owned(),
-				relative_path,
-				size,
-				offset: core::mem::replace(&mut prev_offset, new_offset),
-			});
-		}
+		let entries = discover_entries(&conf.folder, &addon_json.ignore, conf.warn_invalid)?;
 
 		log::info!("Writing GMA metadata...");
 
@@ -225,6 +168,70 @@ trait CreateGma<W: Write> {
 		#[cfg(feature = "binary")] total_size: u64,
 		entries: &[GmaFileEntry],
 	) -> Result<(), FastGmadError>;
+}
+
+fn discover_entries(folder: &Path, ignore: &[String], warn_invalid: bool) -> Result<Vec<GmaFileEntry>, FastGmadError> {
+	let mut entries = Vec::new();
+	let mut prev_offset = 0;
+	for entry in walkdir::WalkDir::new(folder).follow_links(true).sort_by_file_name() {
+		let entry = entry.map_err(|error| {
+			let path = error.path().unwrap_or(folder).to_owned();
+			if let Some(io_error) = error.into_io_error() {
+				fastgmad_io_error!(while "walking directory", error: io_error, path: path)
+			} else {
+				fastgmad_io_error!(while "walking directory", error: std::io::Error::new(std::io::ErrorKind::Other, "unknown"), path: path)
+			}
+		})?;
+		if !entry.file_type().is_file() {
+			continue;
+		}
+
+		let path = entry.path();
+		let relative_path = path
+			.strip_prefix(folder)
+			.map_err(
+				|_| fastgmad_io_error!(error: std::io::Error::new(std::io::ErrorKind::InvalidData, "File not in addon directory"), path: path),
+			)?
+			.to_str()
+			.ok_or_else(
+				|| fastgmad_io_error!(error: std::io::Error::new(std::io::ErrorKind::InvalidData, "File path not valid UTF-8"), path: path),
+			)?
+			.replace('\\', "/");
+
+		if relative_path == "addon.json" {
+			continue;
+		}
+
+		if whitelist::is_ignored(&relative_path, ignore) {
+			continue;
+		}
+
+		if !whitelist::check(&relative_path) {
+			if warn_invalid {
+				log::warn!(
+					"File {} not in GMA whitelist - see https://wiki.facepunch.com/gmod/Workshop_Addon_Creation",
+					relative_path
+				);
+				continue;
+			} else {
+				return Err(fastgmad_error!(error: EntryNotWhitelisted(relative_path)));
+			}
+		}
+
+		let size = std::fs::metadata(path)
+			.map_err(|error| fastgmad_io_error!(while "reading entry metadata", error: error, path: path))?
+			.len();
+
+		let new_offset = prev_offset + size;
+
+		entries.push(GmaFileEntry {
+			path: path.to_owned(),
+			relative_path,
+			size,
+			offset: core::mem::replace(&mut prev_offset, new_offset),
+		});
+	}
+	Ok(entries)
 }
 
 struct StandardCreateGma;
@@ -342,25 +349,15 @@ impl<W: Write + Seek> CreateGma<W> for ParallelCreateGma {
 
 								let res = {
 									let available_memory = (conf.max_io_memory_usage.get() - *memory_usage) as u64;
-									if available_memory >= bytes_left {
-										*memory_usage += bytes_left as usize;
-										drop(memory_usage);
+									let will_read = available_memory.min(bytes_left);
 
-										cur_offset += bytes_left;
+									*memory_usage += will_read as usize;
+									drop(memory_usage);
 
-										let mut buf = Vec::with_capacity(bytes_left as usize);
-										f.read_to_end(&mut buf).map(|_| buf)
-									} else {
-										let will_read = available_memory.min(bytes_left);
+									cur_offset += will_read;
 
-										*memory_usage += will_read as usize;
-										drop(memory_usage);
-
-										cur_offset += will_read;
-
-										let mut buf = Vec::with_capacity(will_read as usize);
-										(&mut f).take(will_read).read_to_end(&mut buf).map(|_| buf)
-									}
+									let mut buf = Vec::with_capacity(will_read as usize);
+									(&mut f).take(will_read).read_to_end(&mut buf).map(|_| buf)
 								};
 
 								let res = res
