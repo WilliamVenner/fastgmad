@@ -7,7 +7,7 @@ pub struct FastGmadError {
 	pub kind: FastGmadErrorKind,
 
 	/// An optional context string
-	pub context: Option<String>
+	pub context: Option<String>,
 }
 impl std::fmt::Display for FastGmadError {
 	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -78,10 +78,7 @@ pub enum FastGmadErrorKind {
 }
 impl From<(PathBuf, std::io::Error)> for FastGmadErrorKind {
 	fn from((path, error): (PathBuf, std::io::Error)) -> Self {
-		Self::PathIoError {
-			path,
-			error,
-		}
+		Self::PathIoError { path, error }
 	}
 }
 
@@ -96,7 +93,7 @@ macro_rules! fastgmad_error {
 				use crate::error::FastGmadErrorKind::*;
 				$kind.into()
 			},
-			context: Some($while.into())
+			context: Some($while.into()),
 		}
 	};
 
@@ -107,7 +104,7 @@ macro_rules! fastgmad_error {
 				use crate::error::FastGmadErrorKind::*;
 				$kind.into()
 			},
-			context: None
+			context: None,
 		}
 	};
 }
