@@ -421,7 +421,10 @@ impl<W: Write + Seek> CreateGma<W> for ParallelCreateGma {
 struct AddonJson {
 	#[serde(skip)]
 	json: String,
+
 	title: String,
+
+	#[serde(default)]
 	ignore: Vec<String>,
 }
 impl AddonJson {
