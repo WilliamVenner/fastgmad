@@ -10,7 +10,7 @@ mod fastgmad_publish {
 	#[cfg(not(feature = "binary"))]
 	include!("../../../fastgmad-publish/src/lib.rs");
 }
-use fastgmad_publish::shared::{CompletedItemUpdate, ItemUpdate, ItemUpdateStatus, PublishStateInterface};
+use fastgmad_publish::shared::{CompletedItemUpdate, CreatedItemInterface, ItemUpdate, ItemUpdateStatus, PublishStateInterface};
 
 use crate::{
 	error::{fastgmad_error, fastgmad_io_error, FastGmadError},
@@ -136,6 +136,8 @@ enum PublishKind<'a> {
 	Update { id: u64, changes: Option<&'a str> },
 }
 fn workshop_upload(#[cfg(feature = "binary")] noprogress: bool, kind: PublishKind, addon: &Path, icon: Option<&Path>) -> Result<u64, FastGmadError> {
+	let mut created_item: Option<Box<dyn CreatedItemInterface>> = None;
+
 	// For some reason we need to manually check the icon file size
 	// Steam just hangs forever if the icon is invalid
 	if let Some(icon) = icon {
@@ -158,47 +160,26 @@ fn workshop_upload(#[cfg(feature = "binary")] noprogress: bool, kind: PublishKin
 	log::info!("Reading GMA metadata...");
 	let mut metadata = GmaPublishingMetadata::try_read(addon)?;
 
+	#[cfg(feature = "binary")]
+	let ctrlc_handle = ctrlc_handling::CtrlCHandle::get();
+
 	log::info!("Preparing content folder...");
 	let content_path = ContentPath::new(addon)?;
 
-	let mut created_item = None;
 	let file_id;
 	let mut legal_agreement_pending;
 	match &kind {
 		PublishKind::Create => {
 			log::info!("Creating new Workshop item...");
 
-			#[cfg(feature = "binary")]
-			let ctrlc_handle = ctrlc_handling::CtrlCHandle::get();
-
-			let mut created = steam
+			let created = steam
 				.create_item()
 				.map_err(|error| fastgmad_error!(error: SteamError(error.to_string())))?;
 
-			#[cfg(feature = "binary")]
-			{
-				ctrlc_handle.check(|| {
-					created.delete();
-				});
-			}
-			#[cfg(not(feature = "binary"))]
-			{
-				// HACK! Suppress unused `mut` warning
-				created = created;
-			}
-
 			file_id = created.file_id();
 			legal_agreement_pending = created.legal_agreement_pending();
-			created_item = Some((created, {
-				#[cfg(feature = "binary")]
-				{
-					ctrlc_handle
-				}
-				#[cfg(not(feature = "binary"))]
-				{
-					()
-				}
-			}));
+
+			created_item = Some(created);
 		}
 		PublishKind::Update { id, .. } => {
 			file_id = *id;
@@ -206,14 +187,35 @@ fn workshop_upload(#[cfg(feature = "binary")] noprogress: bool, kind: PublishKin
 		}
 	}
 
+	#[cfg(feature = "binary")]
+	let ctrlc_check = {
+		let ctrlc_check = |content_path: &ContentPath, created_item: &mut Option<Box<dyn CreatedItemInterface>>| {
+			ctrlc_handle.check(|| {
+				content_path.delete();
+
+				if let Some(created_item) = created_item {
+					created_item.delete();
+				}
+			})
+		};
+
+		// Do a quick check before we start uploading to Steam...
+		ctrlc_check(&content_path, &mut created_item);
+
+		ctrlc_check
+	};
+
 	let icon = match (icon, &kind) {
 		(Some(icon), _) => Some(Cow::Borrowed(icon)),
 
 		(None, PublishKind::Create) => {
 			log::info!("Preparing icon...");
+
 			let default_icon_path = std::env::temp_dir().join("fastgmad-publish/gmpublisher_default_icon.png");
+
 			std::fs::write(&default_icon_path, WORKSHOP_DEFAULT_ICON)
 				.map_err(|error| fastgmad_io_error!(while "writing default icon", error: error))?;
+
 			Some(Cow::Owned(default_icon_path))
 		}
 
@@ -303,12 +305,7 @@ fn workshop_upload(#[cfg(feature = "binary")] noprogress: bool, kind: PublishKin
 				};
 
 				tick_callback = || {
-					if let Some((created_item, ctrlc_handle)) = created_item.as_mut() {
-						ctrlc_handle.check(|| {
-							// If a CTRL+C occurs, delete the newly created item
-							created_item.delete();
-						});
-					}
+					ctrlc_check(&content_path, &mut created_item);
 				};
 			}
 
@@ -341,7 +338,7 @@ fn workshop_upload(#[cfg(feature = "binary")] noprogress: bool, kind: PublishKin
 
 		// Everything OK!
 		// Make sure we don't delete the newly created item
-		if let Some((mut created_item, _)) = created_item {
+		if let Some(mut created_item) = created_item {
 			created_item.mark_as_successful();
 		}
 
@@ -424,10 +421,14 @@ impl ContentPath {
 
 		Ok(Self(dir))
 	}
+
+	fn delete(&self) {
+		std::fs::remove_dir_all(&self.0).ok();
+	}
 }
 impl Drop for ContentPath {
 	fn drop(&mut self) {
-		std::fs::remove_dir_all(&self.0).ok();
+		self.delete();
 	}
 }
 
