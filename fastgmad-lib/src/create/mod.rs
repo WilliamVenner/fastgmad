@@ -189,13 +189,9 @@ fn discover_entries(folder: &Path, ignore: &[String], warn_invalid: bool) -> Res
 		let path = entry.path();
 		let relative_path = path
 			.strip_prefix(folder)
-			.map_err(
-				|_| fastgmad_io_error!(error: std::io::Error::new(std::io::ErrorKind::InvalidData, "File not in addon directory"), path: path),
-			)?
+			.map_err(|_| fastgmad_io_error!(error: std::io::Error::new(std::io::ErrorKind::InvalidData, "File not in addon directory"), path: path))?
 			.to_str()
-			.ok_or_else(
-				|| fastgmad_io_error!(error: std::io::Error::new(std::io::ErrorKind::InvalidData, "File path not valid UTF-8"), path: path),
-			)?
+			.ok_or_else(|| fastgmad_io_error!(error: std::io::Error::new(std::io::ErrorKind::InvalidData, "File path not valid UTF-8"), path: path))?
 			.replace('\\', "/");
 
 		if relative_path == "addon.json" {

@@ -44,9 +44,7 @@ trait ExtractGma {
 			);
 		}
 
-		std::fs::create_dir_all(&conf.out).map_err(|error| {
-			fastgmad_io_error!(while "creating output directory",error: error,path: conf.out)
-		})?;
+		std::fs::create_dir_all(&conf.out).map_err(|error| fastgmad_io_error!(while "creating output directory", error: error, path: conf.out))?;
 
 		log::info!("Reading metadata...");
 
@@ -65,9 +63,9 @@ trait ExtractGma {
 			}
 		}
 
-		let version = r.read_u8().map_err(|error| {
-			fastgmad_io_error!(while "reading version byte", error: error)
-		})?;
+		let version = r
+			.read_u8()
+			.map_err(|error| fastgmad_io_error!(while "reading version byte", error: error))?;
 		if version != GMA_VERSION {
 			log::warn!("File is in GMA version {version}, expected version {GMA_VERSION}, reading anyway...");
 		}
@@ -84,12 +82,11 @@ trait ExtractGma {
 			// Required content
 			loop {
 				buf.clear();
-				let content = r.read_nul_str(&mut buf).map_err(|error| {
-					fastgmad_io_error!(
-						while "reading required content",
-						error: error
-					)
-				})?;
+
+				let content = r
+					.read_nul_str(&mut buf)
+					.map_err(|error| fastgmad_io_error!(while "reading required content", error: error))?;
+
 				if content.is_empty() {
 					break;
 				}
@@ -99,54 +96,41 @@ trait ExtractGma {
 		// Addon name
 		let title = {
 			buf.clear();
-			let title = r.read_nul_str(&mut buf).map_err(|error| {
-				fastgmad_io_error!(
-					while "reading addon name",
-					error: error
-				)
-			})?;
+
+			let title = r
+				.read_nul_str(&mut buf)
+				.map_err(|error| fastgmad_io_error!(while "reading addon name", error: error))?;
+
 			title.to_vec()
 		};
 
 		// addon.json
 		let addon_json = {
 			buf.clear();
-			let addon_json = r.read_nul_str(&mut buf).map_err(|error| {
-				fastgmad_io_error!(
-					while "reading addon description",
-					error: error
-				)
-			})?;
+
+			let addon_json = r
+				.read_nul_str(&mut buf)
+				.map_err(|error| fastgmad_io_error!(while "reading addon description", error: error))?;
+
 			addon_json.to_vec()
 		};
 
 		// Addon author
-		r.skip_nul_str().map_err(|error| {
-			fastgmad_io_error!(
-				while "reading addon author",
-				error: error
-			)
-		})?;
+		r.skip_nul_str()
+			.map_err(|error| fastgmad_io_error!(while "reading addon author", error: error))?;
 
 		// Addon version (unused)
-		r.read_exact(&mut [0u8; 4]).map_err(|error| {
-			fastgmad_io_error!(
-				while "reading addon version",
-				error: error
-			)
-		})?;
+		r.read_exact(&mut [0u8; 4])
+			.map_err(|error| fastgmad_io_error!(while "reading addon version", error: error))?;
 
 		log::info!("Writing addon.json...");
 		let addon_json_path;
 		{
 			addon_json_path = conf.out.join("addon.json");
-			let mut addon_json_f = BufWriter::new(File::create(&addon_json_path).map_err(|error| {
-				fastgmad_io_error!(
-					while "creating addon.json file",
-					error: error,
-					path: addon_json_path
-				)
-			})?);
+			let mut addon_json_f = BufWriter::new(
+				File::create(&addon_json_path)
+					.map_err(|error| fastgmad_io_error!(while "creating addon.json file", error: error, path: addon_json_path))?,
+			);
 			let res = if let Ok(mut kv) = serde_json::from_slice::<serde_json::Map<String, serde_json::Value>>(&addon_json) {
 				// Add title key if it doesn't exist
 				if let serde_json::map::Entry::Vacant(v) = kv.entry("title".to_string()) {
@@ -164,25 +148,14 @@ trait ExtractGma {
 			};
 			res.map_err(|error| {
 				if let Some(io_error) = error.io_error_kind() {
-					fastgmad_io_error!(
-						while "writing addon.json",
-						error: std::io::Error::from(io_error),
-						path: addon_json_path
-					)
+					fastgmad_io_error!(while "writing addon.json", error: std::io::Error::from(io_error), path: addon_json_path)
 				} else {
-					fastgmad_error!(
-						while "serializing addon.json",
-						error: error
-					)
+					fastgmad_error!(while "serializing addon.json", error: error)
 				}
 			})?;
-			addon_json_f.flush().map_err(|error| {
-				fastgmad_io_error!(
-					while "flushing addon.json",
-					error: error,
-					path: addon_json_path
-				)
-			})?;
+			addon_json_f
+				.flush()
+				.map_err(|error| fastgmad_io_error!(while "flushing addon.json", error: error, path: addon_json_path))?;
 		}
 
 		// File index
@@ -199,27 +172,18 @@ trait ExtractGma {
 		{
 			let path = {
 				buf.clear();
-				let path = r.read_nul_str(&mut buf).map_err(|error| {
-					fastgmad_io_error!(
-						while "reading entry path",
-						error: error
-					)
-				})?;
+				let path = r
+					.read_nul_str(&mut buf)
+					.map_err(|error| fastgmad_io_error!(while "reading entry path", error: error))?;
 				path.to_vec()
 			};
 
-			let size = r.read_i64::<LE>().map_err(|error| {
-				fastgmad_io_error!(
-					while "reading entry size",
-					error: error
-				)
-			})?;
-			let _crc = r.read_u32::<LE>().map_err(|error| {
-				fastgmad_io_error!(
-					while "reading entry CRC",
-					error: error
-				)
-			})?;
+			let size = r
+				.read_i64::<LE>()
+				.map_err(|error| fastgmad_io_error!(while "reading entry size", error: error))?;
+			let _crc = r
+				.read_u32::<LE>()
+				.map_err(|error| fastgmad_io_error!(while "reading entry CRC", error: error))?;
 
 			if let Some(entry) = GmaEntry::try_new(&conf.out, path, size) {
 				#[cfg(feature = "binary")]
@@ -280,38 +244,19 @@ impl ExtractGma for StandardExtractGma {
 		for GmaEntry { path, size } in file_index.iter() {
 			if let Some(parent) = path.parent() {
 				if parent != conf.out {
-					std::fs::create_dir_all(parent).map_err(|error| {
-						fastgmad_io_error!(
-							while "creating directory for GMA entry",
-							error: error,
-							path: parent
-						)
-					})?;
+					std::fs::create_dir_all(parent)
+						.map_err(|error| fastgmad_io_error!(while "creating directory for GMA entry", error: error, path: parent))?;
 				}
 			}
 
 			let mut take = r.take(*size as u64);
-			let mut w = File::create(path).map_err(|error| {
-				fastgmad_io_error!(
-					while "creating file for GMA entry",
-					error: error,
-					path: path
-				)
-			})?;
-			std::io::copy(&mut take, &mut w).map_err(|error| {
-				fastgmad_io_error!(
-					while "copying GMA entry data",
-					error: error,
-					path: path
-				)
-			})?;
-			w.flush().map_err(|error| {
-				fastgmad_io_error!(
-					while "flushing GMA entry file",
-					error: error,
-					path: path
-				)
-			})?;
+			let mut w = File::create(path).map_err(|error| fastgmad_io_error!(while "creating file for GMA entry", error: error, path: path))?;
+
+			std::io::copy(&mut take, &mut w).map_err(|error| fastgmad_io_error!(while "copying GMA entry data", error: error, path: path))?;
+
+			w.flush()
+				.map_err(|error| fastgmad_io_error!(while "flushing GMA entry file", error: error, path: path))?;
+
 			r = take.into_inner();
 
 			#[cfg(feature = "binary")]
@@ -369,13 +314,8 @@ impl ExtractGma for ParallelExtractGma {
 					let mut buf = Vec::with_capacity(*size);
 
 					let mut take = r.take(*size as u64);
-					take.read_to_end(&mut buf).map_err(|error| {
-						fastgmad_io_error!(
-							while "reading GMA entry data",
-							error: error,
-							path: path
-						)
-					})?;
+					take.read_to_end(&mut buf)
+						.map_err(|error| fastgmad_io_error!(while "reading GMA entry data", error: error, path: path))?;
 					r = take.into_inner();
 
 					let memory_used = &memory_used;
@@ -384,23 +324,13 @@ impl ExtractGma for ParallelExtractGma {
 						let res = (move || {
 							if let Some(parent) = path.parent() {
 								if parent != conf.out {
-									std::fs::create_dir_all(parent).map_err(|error| {
-										fastgmad_io_error!(
-											while "creating directory for GMA entry",
-											error: error,
-											path: parent
-										)
-									})?;
+									std::fs::create_dir_all(parent)
+										.map_err(|error| fastgmad_io_error!(while "creating directory for GMA entry", error: error, path: parent))?;
 								}
 							}
 
-							std::fs::write(path, buf).map_err(|error| {
-								fastgmad_io_error!(
-									while "writing GMA entry file",
-									error: error,
-									path: path
-								)
-							})?;
+							std::fs::write(path, buf)
+								.map_err(|error| fastgmad_io_error!(while "writing GMA entry file", error: error, path: path))?;
 
 							Ok::<_, FastGmadError>(())
 						})();
@@ -415,38 +345,17 @@ impl ExtractGma for ParallelExtractGma {
 					// Just do it without buffering
 					if let Some(parent) = path.parent() {
 						if parent != conf.out {
-							std::fs::create_dir_all(parent).map_err(|error| {
-								fastgmad_io_error!(
-									while "creating directory for GMA entry",
-									error: error,
-									path: parent
-								)
-							})?;
+							std::fs::create_dir_all(parent)
+								.map_err(|error| fastgmad_io_error!(while "creating directory for GMA entry", error: error, path: parent))?;
 						}
 					}
 
 					let mut take = r.take(*size as u64);
-					let mut w = File::create(path).map_err(|error| {
-						fastgmad_io_error!(
-							while "creating file for GMA entry",
-							error: error,
-							path: path
-						)
-					})?;
-					std::io::copy(&mut take, &mut w).map_err(|error| {
-						fastgmad_io_error!(
-							while "copying GMA entry data",
-							error: error,
-							path: path
-						)
-					})?;
-					w.flush().map_err(|error| {
-						fastgmad_io_error!(
-							while "flushing GMA entry file",
-							error: error,
-							path: path
-						)
-					})?;
+					let mut w =
+						File::create(path).map_err(|error| fastgmad_io_error!(while "creating file for GMA entry", error: error, path: path))?;
+					std::io::copy(&mut take, &mut w).map_err(|error| fastgmad_io_error!(while "copying GMA entry data", error: error, path: path))?;
+					w.flush()
+						.map_err(|error| fastgmad_io_error!(while "flushing GMA entry file", error: error, path: path))?;
 					r = take.into_inner();
 				}
 

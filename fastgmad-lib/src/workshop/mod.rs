@@ -458,43 +458,29 @@ impl GmaPublishingMetadata {
 			}
 		}
 
-		let version = r.read_u8().map_err(|error| {
-			fastgmad_io_error!(
-				while "reading version byte",
-				error: error
-			)
-		})?;
+		let version = r
+			.read_u8()
+			.map_err(|error| fastgmad_io_error!(while "reading version byte", error: error))?;
 		if version != GMA_VERSION {
 			log::warn!("File is in GMA version {version}, expected version {GMA_VERSION}, reading anyway...");
 		}
 
 		// SteamID (unused)
-		r.read_exact(&mut [0u8; 8]).map_err(|error| {
-			fastgmad_io_error!(
-				while "reading SteamID",
-				error: error
-			)
-		})?;
+		r.read_exact(&mut [0u8; 8])
+			.map_err(|error| fastgmad_io_error!(while "reading SteamID", error: error))?;
 
 		// Timestamp
-		r.read_exact(&mut [0u8; 8]).map_err(|error| {
-			fastgmad_io_error!(
-				while "reading timestamp",
-				error: error
-			)
-		})?;
+		r.read_exact(&mut [0u8; 8])
+			.map_err(|error| fastgmad_io_error!(while "reading timestamp", error: error))?;
 
 		if version > 1 {
 			// Required content
 			let mut buf = Vec::new();
 			loop {
 				buf.clear();
-				let content = r.read_nul_str(&mut buf).map_err(|error| {
-					fastgmad_io_error!(
-						while "reading required content",
-						error: error
-					)
-				})?;
+				let content = r
+					.read_nul_str(&mut buf)
+					.map_err(|error| fastgmad_io_error!(while "reading required content", error: error))?;
 				if content.is_empty() {
 					break;
 				}
@@ -504,34 +490,23 @@ impl GmaPublishingMetadata {
 		// Addon name
 		metadata.title = {
 			let mut buf = Vec::new();
-			r.read_nul_str(&mut buf).map_err(|error| {
-				fastgmad_io_error!(
-					while "reading addon name",
-					error: error
-				)
-			})?;
+			r.read_nul_str(&mut buf)
+				.map_err(|error| fastgmad_io_error!(while "reading addon name", error: error))?;
 
 			if buf.last() == Some(&0) {
 				buf.pop();
 			}
 
-			String::from_utf8(buf).map_err(|error| {
-				fastgmad_io_error!(
-					while "decoding addon name",
-					error: std::io::Error::new(std::io::ErrorKind::InvalidData, error)
-				)
-			})?
+			String::from_utf8(buf).map_err(
+				|error| fastgmad_io_error!(while "decoding addon name", error: std::io::Error::new(std::io::ErrorKind::InvalidData, error)),
+			)?
 		};
 
 		// addon.json
 		{
 			let mut buf = Vec::new();
-			r.read_nul_str(&mut buf).map_err(|error| {
-				fastgmad_io_error!(
-					while "reading addon description",
-					error: error
-				)
-			})?;
+			r.read_nul_str(&mut buf)
+				.map_err(|error| fastgmad_io_error!(while "reading addon description", error: error))?;
 
 			if buf.last() == Some(&0) {
 				buf.pop();

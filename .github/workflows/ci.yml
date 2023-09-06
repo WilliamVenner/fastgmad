@@ -45,4 +45,4 @@ jobs:
     steps:
     - uses: actions/checkout@v2
     - name: Test
-      run: cargo test --release --package fastgmad --all
+      run: cargo test --release --package fastgmad
