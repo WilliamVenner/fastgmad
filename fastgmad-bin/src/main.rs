@@ -76,7 +76,7 @@ fn main() {
 				log::error!("fastgmad comes with two additional shared libraries");
 				log::error!("Make sure these shared libraries are present in the same directory & dynamic linker search path as fastgmad, otherwise Workshop publishing will not work");
 			}
-			log::error!("Additionally, it is not recommended to install fastgmad in the bin directory of Garry's Mod, as Garry's Mod itself may use a different version of the Steam API and updates can break this");
+			log::error!("Additionally, it is not recommended to install fastgmad directly in the bin directory of Garry's Mod, as Garry's Mod itself may use a different version of the Steam API and updates can break this. If you have done this, and replaced files in the process, you may have broken your game and will need to verify integrity cache.");
 			eprintln!();
 			Err(err).unwrap()
 		}
