@@ -1,6 +1,6 @@
 use crate::{
 	error::{fastgmad_error, fastgmad_io_error, FastGmadError},
-	util::WriteEx,
+	util::{WriteEx, self},
 	whitelist,
 };
 use std::{
@@ -182,11 +182,16 @@ fn discover_entries(folder: &Path, ignore: &[String], warn_invalid: bool) -> Res
 				fastgmad_io_error!(while "walking directory", error: std::io::Error::new(std::io::ErrorKind::Other, "unknown"), path: path)
 			}
 		})?;
+
 		if !entry.file_type().is_file() {
 			continue;
 		}
 
 		let path = entry.path();
+		if matches!(util::is_hidden_file(path), Ok(true) | Err(_)) {
+			continue;
+		}
+
 		let relative_path = path
 			.strip_prefix(folder)
 			.map_err(|_| fastgmad_io_error!(error: std::io::Error::new(std::io::ErrorKind::InvalidData, "File not in addon directory"), path: path))?
