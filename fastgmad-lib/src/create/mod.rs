@@ -1,6 +1,6 @@
 use crate::{
 	error::{fastgmad_error, fastgmad_io_error, FastGmadError},
-	util::{WriteEx, self},
+	util::{self, WriteEx},
 	whitelist,
 };
 use std::{

@@ -1,9 +1,13 @@
-use std::{io::{BufRead, Write}, path::Path};
+use std::{
+	io::{BufRead, Write},
+	path::Path,
+};
 
 pub fn is_hidden_file(path: &Path) -> Result<bool, std::io::Error> {
 	let hidden;
 
-	#[cfg(unix)] {
+	#[cfg(unix)]
+	{
 		if let Some(file_name) = path.file_name() {
 			use std::os::unix::prelude::OsStrExt;
 			hidden = file_name.as_bytes().starts_with(b".");
@@ -12,7 +16,8 @@ pub fn is_hidden_file(path: &Path) -> Result<bool, std::io::Error> {
 		}
 	}
 
-	#[cfg(windows)] {
+	#[cfg(windows)]
+	{
 		use std::os::windows::fs::MetadataExt;
 		const HIDDEN: u32 = 0x00000002;
 		hidden = std::fs::metadata(path)?.file_attributes() & HIDDEN != 0;
