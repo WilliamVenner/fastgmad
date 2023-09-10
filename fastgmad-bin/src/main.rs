@@ -195,6 +195,7 @@ fn extract(conf: ExtractGmaConfig, r#in: ExtractGmadIn, exit: &mut impl FnMut())
 }
 
 fn publish(conf: WorkshopPublishConfig) -> Result<(), FastGmadBinError> {
+	// TODO allow both creation+publishing in a single command
 	let id = fastgmad::workshop::publish_gma(&conf)?;
 	println!("{}", id);
 	log::info!("Published to https://steamcommunity.com/sharedfiles/filedetails/?id={}", id);
