@@ -16,9 +16,6 @@ use std::{
 mod conf;
 pub use conf::CreateGmaConfig;
 
-#[cfg(feature = "binary")]
-pub use conf::CreateGmadOut;
-
 /// Creates a GMA file from a directory.
 ///
 /// Prefer [`seekable_create_gma`] if your writer type implements [`std::io::Seek`], as it supports parallel I/O.
@@ -30,7 +27,7 @@ pub fn create_gma(conf: &CreateGmaConfig, w: &mut impl Write) -> Result<(), Fast
 ///
 /// Prefer this function over [`create_gma`] if your writer type implements [`std::io::Seek`], as this function supports parallel I/O.
 pub fn seekable_create_gma(conf: &CreateGmaConfig, w: &mut (impl Write + Seek)) -> Result<(), FastGmadError> {
-	if conf.max_io_threads.get() == 1 {
+	if conf.parallelism.max_io_threads.get() == 1 {
 		StandardCreateGma::create_gma_with_done_callback(conf, w, &mut || ())
 	} else {
 		ParallelCreateGma::create_gma_with_done_callback(conf, w, &mut || ())
@@ -48,7 +45,7 @@ pub fn seekable_create_gma_with_done_callback(
 	w: &mut (impl Write + Seek),
 	done_callback: &mut dyn FnMut(),
 ) -> Result<(), FastGmadError> {
-	if conf.max_io_threads.get() == 1 {
+	if conf.parallelism.max_io_threads.get() == 1 {
 		StandardCreateGma::create_gma_with_done_callback(conf, w, done_callback)
 	} else {
 		ParallelCreateGma::create_gma_with_done_callback(conf, w, done_callback)
@@ -245,7 +242,7 @@ impl<W: Write> CreateGma<W> for StandardCreateGma {
 	) -> Result<(), FastGmadError> {
 		#[cfg(feature = "binary")]
 		let mut progress = if !_conf.noprogress {
-			Some(crate::util::ProgressPrinter::new(total_size))
+			Some(ProgressPrinter::new(total_size))
 		} else {
 			None
 		};

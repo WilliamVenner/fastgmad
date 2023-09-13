@@ -1,5 +1,5 @@
 mod conf;
-pub use conf::{WorkshopPublishConfig, WorkshopUpdateConfig};
+pub use conf::{WorkshopPublishConfig, WorkshopUpdateConfig, WorkshopPublishAddonSrc};
 
 mod fastgmad_publish {
 	#[cfg(feature = "binary")]
@@ -293,7 +293,7 @@ fn workshop_upload(#[cfg(feature = "binary")] noprogress: bool, kind: PublishKin
 						}
 						if did_status_change || did_total_change {
 							progress_printer = match (noprogress, new_status, new_total) {
-								(false, Some(_), Some(new_total)) => Some(crate::util::ProgressPrinter::new(new_total.get())),
+								(false, Some(_), Some(new_total)) => Some(ProgressPrinter::new(new_total.get())),
 								_ => None,
 							};
 						}

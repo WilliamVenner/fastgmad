@@ -1,5 +1,6 @@
 use crate::{
 	error::{fastgmad_error, fastgmad_io_error, FastGmadError},
+	extract::conf::{ExtractGmaDestination, ExtractedGmaEntry},
 	util::BufReadEx,
 	GMA_MAGIC, GMA_VERSION,
 };
@@ -15,12 +16,9 @@ use std::{
 mod conf;
 pub use conf::ExtractGmaConfig;
 
-#[cfg(feature = "binary")]
-pub use conf::ExtractGmadIn;
-
 /// Extracts a GMA file to a directory.
-pub fn extract_gma(conf: &ExtractGmaConfig, r: &mut impl BufRead) -> Result<(), FastGmadError> {
-	if conf.max_io_threads.get() == 1 {
+pub fn extract_gma(conf: ExtractGmaConfig, r: &mut impl BufRead) -> Result<(), FastGmadError> {
+	if conf.parallelism.max_io_threads.get() == 1 {
 		StandardExtractGma::extract_gma_with_done_callback(conf, r, &mut || ())
 	} else {
 		ParallelExtractGma::extract_gma_with_done_callback(conf, r, &mut || ())
@@ -28,8 +26,8 @@ pub fn extract_gma(conf: &ExtractGmaConfig, r: &mut impl BufRead) -> Result<(), 
 }
 
 #[cfg(feature = "binary")]
-pub fn extract_gma_with_done_callback(conf: &ExtractGmaConfig, r: &mut impl BufRead, done_callback: &mut dyn FnMut()) -> Result<(), FastGmadError> {
-	if conf.max_io_threads.get() == 1 {
+pub fn extract_gma_with_done_callback(conf: ExtractGmaConfig, r: &mut impl BufRead, done_callback: &mut dyn FnMut()) -> Result<(), FastGmadError> {
+	if conf.parallelism.max_io_threads.get() == 1 {
 		StandardExtractGma::extract_gma_with_done_callback(conf, r, done_callback)
 	} else {
 		ParallelExtractGma::extract_gma_with_done_callback(conf, r, done_callback)
@@ -37,14 +35,20 @@ pub fn extract_gma_with_done_callback(conf: &ExtractGmaConfig, r: &mut impl BufR
 }
 
 trait ExtractGma {
-	fn extract_gma_with_done_callback(conf: &ExtractGmaConfig, r: &mut impl BufRead, done_callback: &mut dyn FnMut()) -> Result<(), FastGmadError> {
-		if conf.out.is_dir() {
-			log::warn!(
-				"Output directory already exists; files not present in this GMA but present in the existing output directory will NOT be deleted"
-			);
-		}
+	fn extract_gma_with_done_callback(
+		mut conf: ExtractGmaConfig,
+		r: &mut impl BufRead,
+		done_callback: &mut dyn FnMut(),
+	) -> Result<(), FastGmadError> {
+		if let ExtractGmaDestination::Directory(dir) = &conf.out {
+			if dir.is_dir() {
+				log::warn!(
+					"Output directory already exists; files not present in this GMA but present in the existing output directory will NOT be deleted"
+				);
+			}
 
-		std::fs::create_dir_all(&conf.out).map_err(|error| fastgmad_io_error!(while "creating output directory", error: error, path: conf.out))?;
+			std::fs::create_dir_all(&dir).map_err(|error| fastgmad_io_error!(while "creating output directory", error: error, path: conf.out))?;
+		}
 
 		log::info!("Reading metadata...");
 
@@ -124,38 +128,52 @@ trait ExtractGma {
 			.map_err(|error| fastgmad_io_error!(while "reading addon version", error: error))?;
 
 		log::info!("Writing addon.json...");
-		let addon_json_path;
-		{
-			addon_json_path = conf.out.join("addon.json");
-			let mut addon_json_f = BufWriter::new(
-				File::create(&addon_json_path)
-					.map_err(|error| fastgmad_io_error!(while "creating addon.json file", error: error, path: addon_json_path))?,
-			);
-			let res = if let Ok(mut kv) = serde_json::from_slice::<serde_json::Map<String, serde_json::Value>>(&addon_json) {
+		let addon_json = serde_json::from_slice::<serde_json::Map<String, serde_json::Value>>(&addon_json)
+			.map(|mut kv| {
 				// Add title key if it doesn't exist
 				if let serde_json::map::Entry::Vacant(v) = kv.entry("title".to_string()) {
 					v.insert(serde_json::Value::String(String::from_utf8_lossy(&title).into_owned()));
 				}
-				serde_json::to_writer_pretty(&mut addon_json_f, &kv)
-			} else {
-				serde_json::to_writer_pretty(
-					&mut addon_json_f,
-					&StubAddonJson {
-						title: String::from_utf8_lossy(&title),
-						description: String::from_utf8_lossy(&addon_json),
-					},
-				)
-			};
-			res.map_err(|error| {
-				if let Some(io_error) = error.io_error_kind() {
-					fastgmad_io_error!(while "writing addon.json", error: std::io::Error::from(io_error), path: addon_json_path)
-				} else {
-					fastgmad_error!(while "serializing addon.json", error: error)
-				}
-			})?;
-			addon_json_f
-				.flush()
-				.map_err(|error| fastgmad_io_error!(while "flushing addon.json", error: error, path: addon_json_path))?;
+				kv
+			})
+			.unwrap_or_else(|_| {
+				let mut kv = serde_json::Map::<String, serde_json::Value>::new();
+				kv.insert("title".to_string(), String::from_utf8_lossy(&title).into());
+				kv.insert("description".to_string(), String::from_utf8_lossy(&addon_json).into());
+				kv
+			});
+
+		match &mut conf.out {
+			ExtractGmaDestination::Directory(out) => {
+				let addon_json_path = out.join("addon.json");
+
+				let mut addon_json_f = BufWriter::new(
+					File::create(&addon_json_path)
+						.map_err(|error| fastgmad_io_error!(while "creating addon.json file", error: error, path: addon_json_path))?,
+				);
+
+				serde_json::to_writer_pretty(&mut addon_json_f, &addon_json).map_err(|error| {
+					if let Some(io_error) = error.io_error_kind() {
+						fastgmad_io_error!(while "writing addon.json", error: std::io::Error::from(io_error), path: addon_json_path)
+					} else {
+						fastgmad_error!(while "serializing addon.json", error: error)
+					}
+				})?;
+
+				addon_json_f
+					.flush()
+					.map_err(|error| fastgmad_io_error!(while "flushing addon.json", error: error, path: addon_json_path))?;
+			}
+
+			ExtractGmaDestination::Callback(callback) => {
+				let data =
+					serde_json::to_vec_pretty(&addon_json).map_err(|error| fastgmad_error!(while "serializing addon.json", error: error))?;
+
+				callback(ExtractedGmaEntry {
+					path: "addon.json".to_string(),
+					data,
+				});
+			}
 		}
 
 		// File index
@@ -210,7 +228,6 @@ trait ExtractGma {
 		// We may exit the process in done_callback (thereby allowing the OS to free the memory),
 		// so make sure the optimiser knows to free all the memory here.
 		done_callback();
-		drop(addon_json_path);
 		drop(addon_json);
 		drop(file_index);
 		drop(buf);
@@ -219,7 +236,7 @@ trait ExtractGma {
 	}
 
 	fn write_entries(
-		conf: &ExtractGmaConfig,
+		conf: ExtractGmaConfig,
 		r: &mut impl BufRead,
 		#[cfg(feature = "binary")] total_size: u64,
 		file_index: &[GmaEntry],
@@ -229,14 +246,14 @@ trait ExtractGma {
 struct StandardExtractGma;
 impl ExtractGma for StandardExtractGma {
 	fn write_entries(
-		conf: &ExtractGmaConfig,
+		conf: ExtractGmaConfig,
 		mut r: &mut impl BufRead,
 		#[cfg(feature = "binary")] total_size: u64,
 		file_index: &[GmaEntry],
 	) -> Result<(), FastGmadError> {
 		#[cfg(feature = "binary")]
 		let mut progress = if !conf.noprogress {
-			Some(crate::util::ProgressPrinter::new(total_size))
+			Some(ProgressPrinter::new(total_size))
 		} else {
 			None
 		};

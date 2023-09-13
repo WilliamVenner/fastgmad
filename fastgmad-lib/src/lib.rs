@@ -33,8 +33,6 @@ pub mod whitelist;
 pub mod workshop;
 
 #[cfg(feature = "binary")]
-pub mod bin_prelude {
-	pub use crate::util::PrintHelp;
-	pub use libloading;
-	pub use log;
-}
+pub mod binary;
+
+mod conf;
