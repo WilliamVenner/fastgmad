@@ -389,7 +389,7 @@ impl ContentPath {
 
 		let temp_gma_path = dir.join("fastgmad.gma");
 
-		let symlink_result: Result<(), FastGmadError> = {
+		let symlink_result: Result<(), std::io::Error> = {
 			#[cfg(windows)]
 			{
 				let res = std::os::windows::fs::symlink_file(gma_path, &temp_gma_path);
@@ -414,7 +414,7 @@ impl ContentPath {
 
 			#[cfg(not(windows))]
 			{
-				Err(fastgmad_io_error!(error: std::io::Error::from(std::io::ErrorKind::Unsupported)))
+				Err(std::io::Error::from(std::io::ErrorKind::Unsupported))
 			}
 		};
 
