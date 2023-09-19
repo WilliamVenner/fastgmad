@@ -1,3 +1,5 @@
+#![allow(clippy::unnecessary_literal_unwrap)]
+
 use fastgmad::{
 	bin_prelude::*,
 	create::{CreateGmaConfig, CreateGmadOut},

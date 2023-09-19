@@ -227,7 +227,7 @@ fn workshop_upload(#[cfg(feature = "binary")] noprogress: bool, kind: PublishKin
 
 		// Add "Addon" and the addon type to the tags
 		let tags = {
-			let mut tags = BTreeSet::from_iter(metadata.tags.into_iter());
+			let mut tags = BTreeSet::from_iter(metadata.tags);
 
 			tags.insert("Addon".to_string());
 
@@ -389,7 +389,7 @@ impl ContentPath {
 
 		let temp_gma_path = dir.join("fastgmad.gma");
 
-		let symlink_result = {
+		let symlink_result: Result<(), FastGmadError> = {
 			#[cfg(windows)]
 			{
 				let res = std::os::windows::fs::symlink_file(gma_path, &temp_gma_path);
@@ -401,16 +401,20 @@ impl ContentPath {
 				}
 				res
 			}
+
+			/*
+			Steamworks doesn't recognise symlinks on Unix :<
+
 			#[cfg(unix)]
 			{
 				std::os::unix::fs::symlink(gma_path, &temp_gma_path)
 			}
 			#[cfg(not(any(windows, unix)))]
+			*/
+
+			#[cfg(not(windows))]
 			{
-				Err(FastGmadError::IoError(std::io::Error::new(
-					std::io::ErrorKind::Other,
-					"Unsupported platform",
-				)))
+				Err(fastgmad_io_error!(error: std::io::Error::from(std::io::ErrorKind::Unsupported)))
 			}
 		};
 
