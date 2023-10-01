@@ -1,6 +1,6 @@
 use crate::{
 	error::{fastgmad_error, fastgmad_io_error, FastGmadError},
-	util::BufReadEx,
+	util::{BufReadEx, IoSkip},
 	GMA_MAGIC, GMA_VERSION,
 };
 use byteorder::{ReadBytesExt, LE};
@@ -19,7 +19,7 @@ pub use conf::ExtractGmaConfig;
 pub use conf::ExtractGmadIn;
 
 /// Extracts a GMA file to a directory.
-pub fn extract_gma(conf: &ExtractGmaConfig, r: &mut impl BufRead) -> Result<(), FastGmadError> {
+pub fn extract_gma(conf: &ExtractGmaConfig, r: &mut (impl BufRead + IoSkip)) -> Result<(), FastGmadError> {
 	if conf.max_io_threads.get() == 1 {
 		StandardExtractGma::extract_gma_with_done_callback(conf, r, &mut || ())
 	} else {
@@ -28,7 +28,7 @@ pub fn extract_gma(conf: &ExtractGmaConfig, r: &mut impl BufRead) -> Result<(), 
 }
 
 #[cfg(feature = "binary")]
-pub fn extract_gma_with_done_callback(conf: &ExtractGmaConfig, r: &mut impl BufRead, done_callback: &mut dyn FnMut()) -> Result<(), FastGmadError> {
+pub fn extract_gma_with_done_callback(conf: &ExtractGmaConfig, r: &mut (impl BufRead + IoSkip), done_callback: &mut dyn FnMut()) -> Result<(), FastGmadError> {
 	if conf.max_io_threads.get() == 1 {
 		StandardExtractGma::extract_gma_with_done_callback(conf, r, done_callback)
 	} else {
@@ -37,7 +37,7 @@ pub fn extract_gma_with_done_callback(conf: &ExtractGmaConfig, r: &mut impl BufR
 }
 
 trait ExtractGma {
-	fn extract_gma_with_done_callback(conf: &ExtractGmaConfig, r: &mut impl BufRead, done_callback: &mut dyn FnMut()) -> Result<(), FastGmadError> {
+	fn extract_gma_with_done_callback(conf: &ExtractGmaConfig, r: &mut (impl BufRead + IoSkip), done_callback: &mut dyn FnMut()) -> Result<(), FastGmadError> {
 		if conf.out.is_dir() {
 			log::warn!(
 				"Output directory already exists; files not present in this GMA but present in the existing output directory will NOT be deleted"
@@ -220,7 +220,7 @@ trait ExtractGma {
 
 	fn write_entries(
 		conf: &ExtractGmaConfig,
-		r: &mut impl BufRead,
+		r: &mut (impl BufRead + IoSkip),
 		#[cfg(feature = "binary")] total_size: u64,
 		file_index: &[GmaEntry],
 	) -> Result<(), FastGmadError>;
@@ -230,7 +230,7 @@ struct StandardExtractGma;
 impl ExtractGma for StandardExtractGma {
 	fn write_entries(
 		conf: &ExtractGmaConfig,
-		mut r: &mut impl BufRead,
+		mut r: &mut (impl BufRead + IoSkip),
 		#[cfg(feature = "binary")] total_size: u64,
 		file_index: &[GmaEntry],
 	) -> Result<(), FastGmadError> {
@@ -242,6 +242,15 @@ impl ExtractGma for StandardExtractGma {
 		};
 
 		for GmaEntry { path, size } in file_index.iter() {
+			let path = match path {
+				Some(path) => path,
+				None => {
+					// Skip past the entry if we couldn't get a path for it
+					r.skip(*size as u64).map_err(|error| fastgmad_io_error!(while "skipping past GMA entry data", error: error))?;
+					continue;
+				}
+			};
+
 			if let Some(parent) = path.parent() {
 				if parent != conf.out {
 					std::fs::create_dir_all(parent)
@@ -273,7 +282,7 @@ struct ParallelExtractGma;
 impl ExtractGma for ParallelExtractGma {
 	fn write_entries(
 		conf: &ExtractGmaConfig,
-		r: &mut impl BufRead,
+		r: &mut (impl BufRead + IoSkip),
 		#[cfg(feature = "binary")] total_size: u64,
 		file_index: &[GmaEntry],
 	) -> Result<(), FastGmadError> {
@@ -296,6 +305,15 @@ impl ExtractGma for ParallelExtractGma {
 					Ok(Some(_)) | Err(std::sync::TryLockError::WouldBlock) => break,
 					Err(err @ std::sync::TryLockError::Poisoned(_)) => Err(err).unwrap(),
 				}
+
+				let path = match path {
+					Some(path) => path,
+					None => {
+						// Skip past the entry if we couldn't get a path for it
+						r.skip(*size as u64).map_err(|error| fastgmad_io_error!(while "skipping past GMA entry data", error: error))?;
+						continue;
+					}
+				};
 
 				let can_buffer = |memory_used| {
 					let new_memory_used = memory_used + *size;
@@ -382,7 +400,7 @@ struct StubAddonJson<'a> {
 }
 
 struct GmaEntry {
-	path: PathBuf,
+	path: Option<PathBuf>,
 	size: usize,
 }
 impl GmaEntry {
@@ -396,23 +414,22 @@ impl GmaEntry {
 		};
 
 		let path = match String::from_utf8(path) {
-			Ok(path) => path,
+			Ok(path) => Some(path).and_then(|path| {
+				let path = Path::new(&path);
+				if path.components().any(|c| matches!(c, Component::ParentDir | Component::Prefix(_))) {
+					log::warn!("Skipping GMA entry with invalid file path: {:?}", path);
+					None
+				} else {
+					Some(base_path.join(path))
+				}
+			}),
 			Err(err) => {
 				log::info!(
 					"warning: skipping GMA entry with non-UTF-8 file path: {:?}",
 					String::from_utf8_lossy(err.as_bytes())
 				);
-				return None;
+				None
 			}
-		};
-
-		let path = {
-			let path = Path::new(&path);
-			if path.components().any(|c| matches!(c, Component::ParentDir | Component::Prefix(_))) {
-				log::warn!("Skipping GMA entry with invalid file path: {:?}", path);
-				return None;
-			}
-			base_path.join(path)
 		};
 
 		Some(Self { path, size })

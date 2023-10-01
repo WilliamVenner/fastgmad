@@ -1,6 +1,6 @@
 use std::{
-	io::{BufRead, Write},
-	path::Path,
+	io::{BufRead, Write, Seek, SeekFrom, StdinLock, BufReader},
+	path::Path, fs::File,
 };
 
 pub fn is_hidden_file(path: &Path) -> Result<bool, std::io::Error> {
@@ -72,6 +72,37 @@ impl<R: BufRead> BufReadEx for R {
 
 	fn skip_nul_str(&mut self) -> Result<(), std::io::Error> {
 		self.skip_until(0).map(|_| ())
+	}
+}
+
+pub trait IoSkip {
+	fn skip(&mut self, bytes: u64) -> Result<(), std::io::Error>;
+}
+impl IoSkip for File {
+	fn skip(&mut self, bytes: u64) -> Result<(), std::io::Error> {
+		let pos = self.stream_position()?;
+		self.seek(SeekFrom::Start(pos + bytes))?;
+		Ok(())
+	}
+}
+impl IoSkip for BufReader<File> {
+	fn skip(&mut self, bytes: u64) -> Result<(), std::io::Error> {
+		let pos = self.stream_position()?;
+		self.seek(SeekFrom::Start(pos + bytes))?;
+		Ok(())
+	}
+}
+impl IoSkip for StdinLock<'_> {
+	fn skip(&mut self, bytes: u64) -> Result<(), std::io::Error> {
+		let mut consumed = 0;
+		while consumed < bytes {
+			let buffered = self.fill_buf()?;
+			let buffered = buffered.len();
+			let consume = (bytes - consumed).min(buffered as u64);
+			self.consume(consume as _);
+			consumed += consume;
+		}
+		Ok(())
 	}
 }
 
