@@ -186,6 +186,7 @@ dependencies = [
  "thiserror",
  "uuid",
  "walkdir",
+ "winapi",
  "zip",
 ]
 

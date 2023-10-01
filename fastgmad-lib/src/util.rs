@@ -1,6 +1,7 @@
 use std::{
-	io::{BufRead, Write, Seek, SeekFrom, StdinLock, BufReader},
-	path::Path, fs::File,
+	fs::File,
+	io::{BufRead, BufReader, Seek, SeekFrom, StdinLock, Write},
+	path::Path,
 };
 
 pub fn is_hidden_file(path: &Path) -> Result<bool, std::io::Error> {
@@ -104,6 +105,26 @@ impl IoSkip for StdinLock<'_> {
 		}
 		Ok(())
 	}
+}
+
+#[cfg(windows)]
+pub fn ansi_to_wide(ansi: &[u8]) -> Result<Vec<u16>, std::io::Error> {
+	use winapi::um::{stringapiset::MultiByteToWideChar, winnls::CP_ACP};
+
+	// Get the required buffer size.
+	let required_size = unsafe { MultiByteToWideChar(CP_ACP, 0, ansi.as_ptr() as *const i8, ansi.len() as i32, core::ptr::null_mut(), 0) };
+	if required_size == 0 {
+		return Err(std::io::Error::last_os_error());
+	}
+
+	// Convert the ANSI string to wide string.
+	let mut wide = vec![0u16; required_size as usize];
+	let ret = unsafe { MultiByteToWideChar(CP_ACP, 0, ansi.as_ptr() as *const i8, ansi.len() as i32, wide.as_mut_ptr(), required_size) };
+	if ret == 0 {
+		return Err(std::io::Error::last_os_error());
+	}
+
+	Ok(wide)
 }
 
 #[cfg(feature = "binary")]

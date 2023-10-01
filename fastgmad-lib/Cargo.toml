@@ -24,6 +24,9 @@ steamworks = { version = "0.9", optional = true }
 libloading = { version = "0.8", optional = true }
 thiserror = "1"
 
+[target.'cfg(windows)'.dependencies]
+winapi = { version = "0.3", features = ["stringapiset"] }
+
 [dev-dependencies]
 lazy_static = "1"
 sysreq = "0.1.6"

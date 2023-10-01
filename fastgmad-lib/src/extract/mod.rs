@@ -28,7 +28,11 @@ pub fn extract_gma(conf: &ExtractGmaConfig, r: &mut (impl BufRead + IoSkip)) -> 
 }
 
 #[cfg(feature = "binary")]
-pub fn extract_gma_with_done_callback(conf: &ExtractGmaConfig, r: &mut (impl BufRead + IoSkip), done_callback: &mut dyn FnMut()) -> Result<(), FastGmadError> {
+pub fn extract_gma_with_done_callback(
+	conf: &ExtractGmaConfig,
+	r: &mut (impl BufRead + IoSkip),
+	done_callback: &mut dyn FnMut(),
+) -> Result<(), FastGmadError> {
 	if conf.max_io_threads.get() == 1 {
 		StandardExtractGma::extract_gma_with_done_callback(conf, r, done_callback)
 	} else {
@@ -37,7 +41,11 @@ pub fn extract_gma_with_done_callback(conf: &ExtractGmaConfig, r: &mut (impl Buf
 }
 
 trait ExtractGma {
-	fn extract_gma_with_done_callback(conf: &ExtractGmaConfig, r: &mut (impl BufRead + IoSkip), done_callback: &mut dyn FnMut()) -> Result<(), FastGmadError> {
+	fn extract_gma_with_done_callback(
+		conf: &ExtractGmaConfig,
+		r: &mut (impl BufRead + IoSkip),
+		done_callback: &mut dyn FnMut(),
+	) -> Result<(), FastGmadError> {
 		if conf.out.is_dir() {
 			log::warn!(
 				"Output directory already exists; files not present in this GMA but present in the existing output directory will NOT be deleted"
@@ -181,18 +189,19 @@ trait ExtractGma {
 			let size = r
 				.read_i64::<LE>()
 				.map_err(|error| fastgmad_io_error!(while "reading entry size", error: error))?;
+
 			let _crc = r
 				.read_u32::<LE>()
 				.map_err(|error| fastgmad_io_error!(while "reading entry CRC", error: error))?;
 
-			if let Some(entry) = GmaEntry::try_new(&conf.out, path, size) {
-				#[cfg(feature = "binary")]
-				{
-					total_size += entry.size as u64;
-				}
+			let entry = GmaEntry::new(&conf.out, path, size)?;
 
-				file_index.push(entry);
+			#[cfg(feature = "binary")]
+			{
+				total_size += entry.size as u64;
 			}
+
+			file_index.push(entry);
 		}
 
 		// File contents
@@ -246,7 +255,8 @@ impl ExtractGma for StandardExtractGma {
 				Some(path) => path,
 				None => {
 					// Skip past the entry if we couldn't get a path for it
-					r.skip(*size as u64).map_err(|error| fastgmad_io_error!(while "skipping past GMA entry data", error: error))?;
+					r.skip(*size as u64)
+						.map_err(|error| fastgmad_io_error!(while "skipping past GMA entry data", error: error))?;
 					continue;
 				}
 			};
@@ -310,7 +320,8 @@ impl ExtractGma for ParallelExtractGma {
 					Some(path) => path,
 					None => {
 						// Skip past the entry if we couldn't get a path for it
-						r.skip(*size as u64).map_err(|error| fastgmad_io_error!(while "skipping past GMA entry data", error: error))?;
+						r.skip(*size as u64)
+							.map_err(|error| fastgmad_io_error!(while "skipping past GMA entry data", error: error))?;
 						continue;
 					}
 				};
@@ -404,34 +415,69 @@ struct GmaEntry {
 	size: usize,
 }
 impl GmaEntry {
-	fn try_new(base_path: &Path, path: Vec<u8>, size: i64) -> Option<Self> {
+	fn new(base_path: &Path, path: Vec<u8>, size: i64) -> Result<Self, FastGmadError> {
+		let path = {
+			#[cfg(unix)]
+			{
+				use std::{ffi::OsString, os::unix::ffi::OsStringExt};
+				let path = OsString::from_vec(path);
+				Some(path)
+			}
+			#[cfg(windows)]
+			{
+				use std::{ffi::OsString, os::windows::ffi::OsStringExt};
+				match crate::util::ansi_to_wide(&path) {
+					Ok(path) => Some(OsString::from_wide(&path)),
+					Err(err) => {
+						log::info!(
+							"warning: skipping GMA entry with incompatible file path: {:?} ({err})",
+							String::from_utf8_lossy(&path),
+							err
+						);
+						None
+					}
+				}
+			}
+			#[cfg(not(any(unix, windows)))]
+			{
+				match String::from_utf8(path) {
+					Ok(path) => Some(PathBuf::from(path)),
+					Err(err) => {
+						log::info!(
+							"warning: skipping GMA entry with non-UTF-8 file path: {:?}",
+							String::from_utf8_lossy(err.as_bytes())
+						);
+						None
+					}
+				}
+			}
+		};
+
 		let size = match usize::try_from(size) {
 			Ok(size) => size,
 			Err(_) => {
-				log::warn!("Skipping GMA entry with unsupported file size ({size} bytes): {path:?}");
-				return None;
-			}
-		};
-
-		let path = match String::from_utf8(path) {
-			Ok(path) => Some(path).and_then(|path| {
-				let path = Path::new(&path);
-				if path.components().any(|c| matches!(c, Component::ParentDir | Component::Prefix(_))) {
-					log::warn!("Skipping GMA entry with invalid file path: {:?}", path);
-					None
-				} else {
-					Some(base_path.join(path))
-				}
-			}),
-			Err(err) => {
-				log::info!(
-					"warning: skipping GMA entry with non-UTF-8 file path: {:?}",
-					String::from_utf8_lossy(err.as_bytes())
+				let error = std::io::Error::new(
+					std::io::ErrorKind::InvalidData,
+					format!("Unsupported file size for this system ({size} bytes > max {} bytes)", usize::MAX),
 				);
-				None
+				if let Some(path) = path {
+					return Err(fastgmad_io_error!(while "reading GMA entry size", error: error, path: path));
+				} else {
+					return Err(fastgmad_io_error!(while "reading GMA entry size", error: error));
+				}
 			}
 		};
 
-		Some(Self { path, size })
+		let path = path.and_then(|path| {
+			let path = Path::new(&path);
+			if path.components().any(|c| matches!(c, Component::ParentDir | Component::Prefix(_))) {
+				log::warn!("Skipping GMA entry with invalid file path: {:?}", path);
+				None
+			} else {
+				Some(base_path.join(path))
+			}
+		});
+
+		Ok(Self { path, size })
 	}
 }
