@@ -84,6 +84,8 @@ impl ExtractGmaConfig {
 				if !dir.exists() || dir.is_dir() {
 					config.out = dir;
 				}
+			} else {
+				return Err(PrintHelp(Some("Please provide an output path")));
 			}
 		}
 
