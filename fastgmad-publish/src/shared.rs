@@ -37,6 +37,7 @@ pub trait CreatedItemInterface {
 }
 
 #[repr(C)]
+#[derive(Debug)]
 pub struct ItemUpdate<'a> {
 	pub file_id: u64,
 	pub content_path: &'a Path,

@@ -8,8 +8,8 @@ description = "Fast gmad and gmpublish implementation"
 repository = "https://github.com/WilliamVenner/fastgmad"
 
 [features]
-binary = ["dep:libloading", "dep:ctrlc", "workshop"]
-workshop = ["dep:steamworks"]
+binary = ["dep:libloading", "dep:ctrlc", "dep:steamworks"]
+workshop = ["dep:fastgmad-publish", "dep:steamworks"]
 
 [dependencies]
 walkdir = "2"
@@ -19,10 +19,15 @@ memchr = "2"
 byteorder = "1"
 uuid = { version = "1", features = ["v4"] }
 log = "0.4"
-ctrlc = { version = "3", optional = true }
-steamworks = { version = "0.9", optional = true }
-libloading = { version = "0.8", optional = true }
 thiserror = "1"
+
+# `binary` dependencies
+ctrlc = { version = "3", optional = true }
+libloading = { version = "0.8", optional = true }
+
+# `workshop` dependencies
+fastgmad-publish = { path = "../fastgmad-publish", optional = true }
+steamworks = { version = "0.10", optional = true }
 
 [target.'cfg(windows)'.dependencies]
 winapi = { version = "0.3", features = ["stringapiset"] }

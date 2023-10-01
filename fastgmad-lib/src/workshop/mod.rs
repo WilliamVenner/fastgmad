@@ -13,6 +13,7 @@ mod fastgmad_publish {
 use fastgmad_publish::shared::{CompletedItemUpdate, CreatedItemInterface, ItemUpdate, ItemUpdateStatus, PublishStateInterface};
 
 use crate::{
+	create::CreateGmaConfig,
 	error::{fastgmad_error, fastgmad_io_error, FastGmadError},
 	util::BufReadEx,
 	GMA_MAGIC, GMA_VERSION,
@@ -22,7 +23,7 @@ use std::{
 	borrow::Cow,
 	collections::BTreeSet,
 	fs::File,
-	io::{BufReader, Read},
+	io::{BufReader, BufWriter, Read},
 	path::Path,
 	path::PathBuf,
 };
@@ -135,7 +136,37 @@ enum PublishKind<'a> {
 	Create,
 	Update { id: u64, changes: Option<&'a str> },
 }
-fn workshop_upload(#[cfg(feature = "binary")] noprogress: bool, kind: PublishKind, addon: &Path, icon: Option<&Path>) -> Result<u64, FastGmadError> {
+fn workshop_upload(
+	#[cfg(feature = "binary")] noprogress: bool,
+	kind: PublishKind,
+	addon: &Path,
+	icon: Option<&Path>,
+	create_config: &Option<CreateGmaConfig>,
+) -> Result<u64, FastGmadError> {
+	let content_path;
+	let addon = match create_config {
+		Some(create_config) => {
+			// Create the .GMA
+
+			content_path = ContentPath::empty()?;
+
+			let addon = content_path.0.join("fastgmad.gma");
+
+			let mut gma =
+				BufWriter::new(File::create(&addon).map_err(|error| fastgmad_io_error!(while "creating addon file", error: error, path: addon))?);
+
+			crate::create::seekable_create_gma(create_config, &mut gma)?;
+
+			Cow::Owned(addon)
+		}
+
+		None => {
+			log::info!("Preparing content folder...");
+			content_path = ContentPath::new(addon)?;
+			Cow::Borrowed(addon)
+		}
+	};
+
 	let mut created_item: Option<Box<dyn CreatedItemInterface>> = None;
 
 	// For some reason we need to manually check the icon file size
@@ -158,13 +189,10 @@ fn workshop_upload(#[cfg(feature = "binary")] noprogress: bool, kind: PublishKin
 	let steam = init_steam()?;
 
 	log::info!("Reading GMA metadata...");
-	let mut metadata = GmaPublishingMetadata::try_read(addon)?;
+	let mut metadata = GmaPublishingMetadata::try_read(addon.as_ref())?;
 
 	#[cfg(feature = "binary")]
 	let ctrlc_handle = ctrlc_handling::CtrlCHandle::get();
-
-	log::info!("Preparing content folder...");
-	let content_path = ContentPath::new(addon)?;
 
 	let file_id;
 	let mut legal_agreement_pending;
@@ -362,6 +390,7 @@ pub fn publish_gma(conf: &WorkshopPublishConfig) -> Result<u64, FastGmadError> {
 		PublishKind::Create,
 		&conf.addon,
 		conf.icon.as_deref(),
+		&conf.create_config,
 	)
 }
 
@@ -376,18 +405,23 @@ pub fn update_gma(conf: &WorkshopUpdateConfig) -> Result<(), FastGmadError> {
 		},
 		&conf.addon,
 		conf.icon.as_deref(),
+		&conf.create_config,
 	)
 	.map(|_| ())
 }
 
 struct ContentPath(PathBuf);
 impl ContentPath {
-	fn new(gma_path: &Path) -> Result<Self, FastGmadError> {
+	fn empty() -> Result<Self, FastGmadError> {
 		let dir = std::env::temp_dir().join(format!("fastgmad-publish/{}", Uuid::new_v4()));
-
 		std::fs::create_dir_all(&dir).map_err(|error| fastgmad_io_error!(while "creating content path directory", error: error, path: dir))?;
+		Ok(Self(dir))
+	}
 
-		let temp_gma_path = dir.join("fastgmad.gma");
+	fn new(gma_path: &Path) -> Result<Self, FastGmadError> {
+		let this = Self::empty()?;
+
+		let temp_gma_path = this.0.join("fastgmad.gma");
 
 		let symlink_result: Result<(), std::io::Error> = {
 			#[cfg(windows)]
@@ -402,17 +436,12 @@ impl ContentPath {
 				res
 			}
 
-			/*
-			Steamworks doesn't recognise symlinks on Unix :<
-
 			#[cfg(unix)]
 			{
 				std::os::unix::fs::symlink(gma_path, &temp_gma_path)
 			}
-			#[cfg(not(any(windows, unix)))]
-			*/
 
-			#[cfg(not(windows))]
+			#[cfg(not(any(windows, unix)))]
 			{
 				Err(std::io::Error::from(std::io::ErrorKind::Unsupported))
 			}
@@ -423,7 +452,7 @@ impl ContentPath {
 				.map_err(|error| fastgmad_io_error!(while "copying .gma to temporary directory", error: error, paths: (gma_path, temp_gma_path)))?;
 		}
 
-		Ok(Self(dir))
+		Ok(this)
 	}
 
 	fn delete(&self) {

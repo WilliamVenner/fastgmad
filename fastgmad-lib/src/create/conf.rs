@@ -29,13 +29,12 @@ pub struct CreateGmaConfig {
 }
 impl CreateGmaConfig {
 	#[cfg(feature = "binary")]
-	pub fn from_args() -> Result<(Self, CreateGmadOut), crate::util::PrintHelp> {
+	pub fn from_args(mut args: impl Iterator<Item = std::ffi::OsString>) -> Result<(Self, CreateGmadOut), crate::util::PrintHelp> {
 		use crate::util::PrintHelp;
 
 		let mut config = Self::default();
 		let mut out = None;
 
-		let mut args = std::env::args_os().skip(2);
 		while let Some(arg) = args.next() {
 			match arg.to_str().ok_or(PrintHelp(Some("Unknown GMAD creation argument")))? {
 				"-warninvalid" => {
@@ -79,6 +78,10 @@ impl CreateGmaConfig {
 				}
 				_ => return Err(PrintHelp(Some("Unknown GMAD creation argument"))),
 			}
+		}
+
+		if config.folder.as_os_str().is_empty() {
+			return Err(PrintHelp(Some("Please provide a folder to create a GMA from")));
 		}
 
 		Ok((config, out.ok_or(PrintHelp(Some("Please provide an output path for GMAD creation")))?))

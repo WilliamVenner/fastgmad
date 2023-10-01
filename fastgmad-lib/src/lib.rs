@@ -9,6 +9,9 @@
 #![cfg_attr(not(feature = "binary"), warn(missing_docs))]
 #![allow(clippy::unnecessary_literal_unwrap)]
 
+#[cfg(all(feature = "binary", feature = "workshop"))]
+compile_error!("Cannot enable both `binary` and `workshop` features (`binary` implies `workshop`)");
+
 const GMA_MAGIC: &[u8] = b"GMAD";
 const GMA_VERSION: u8 = 3;
 
@@ -29,7 +32,7 @@ pub mod extract;
 /// GMA file pattern whitelist
 pub mod whitelist;
 
-#[cfg(feature = "workshop")]
+#[cfg(any(feature = "binary", feature = "workshop"))]
 /// Workshop publishing
 pub mod workshop;
 

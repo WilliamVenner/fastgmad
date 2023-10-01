@@ -18,15 +18,13 @@ jobs:
       matrix:
         target: ["--all", "--package fastgmad"]
         release: ["", "--release"]
-        features: ["", "--all-features", "--features workshop"]
+        features: ["", "--features binary", "--features workshop"]
         exclude:
           # Exclude combinations that are not needed
           - target: "--all"
             features: "--features workshop"
-          - target: "--all"
-            features: "--all-features"
           - target: "--package fastgmad"
-            features: "--all-features"
+            features: "--features binary"
     steps:
     - uses: actions/checkout@v2
     - name: Check

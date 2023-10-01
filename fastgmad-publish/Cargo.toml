@@ -14,4 +14,4 @@ crate-type = ["cdylib"]
 binary = []
 
 [dependencies]
-steamworks = "0.9"
+steamworks = "0.10"

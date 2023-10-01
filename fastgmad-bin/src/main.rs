@@ -79,6 +79,13 @@ fn main() {
 				log::error!("Make sure these shared libraries are present in the same directory & dynamic linker search path as fastgmad, otherwise Workshop publishing will not work");
 			}
 			log::error!("Additionally, it is not recommended to install fastgmad directly in the bin directory of Garry's Mod, as Garry's Mod itself may use a different version of the Steam API and updates can break this. If you have done this, and replaced files in the process, you may have broken your game and will need to verify integrity cache.");
+
+			#[cfg(debug_assertions)]
+			{
+				eprintln!();
+				log::error!("DEBUG ASSERTIONS ARE ON: If you're developing fastgmad, don't forget to type `cargo build --all --features binary` to generate the dependencies. Also, you need to `cargo run` with `--features binary`");
+			}
+
 			eprintln!();
 			Err(err).unwrap()
 		}
@@ -136,7 +143,7 @@ fn bin() -> Result<(), FastGmadBinError> {
 	} else {
 		match cmd.to_str() {
 			Some("create") => {
-				let (conf, out) = CreateGmaConfig::from_args()?;
+				let (conf, out) = CreateGmaConfig::from_args(std::env::args_os().skip(2))?;
 				create(conf, out, &mut exit)
 			}
 
@@ -196,6 +203,7 @@ fn extract(conf: ExtractGmaConfig, r#in: ExtractGmadIn, exit: &mut impl FnMut())
 	Ok(())
 }
 
+#[cfg(any(feature = "binary", feature = "workshop"))]
 fn publish(conf: WorkshopPublishConfig) -> Result<(), FastGmadBinError> {
 	// TODO allow both creation+publishing in a single command
 	let id = fastgmad::workshop::publish_gma(&conf)?;
@@ -204,6 +212,7 @@ fn publish(conf: WorkshopPublishConfig) -> Result<(), FastGmadBinError> {
 	Ok(())
 }
 
+#[cfg(any(feature = "binary", feature = "workshop"))]
 fn update(conf: WorkshopUpdateConfig) -> Result<(), FastGmadBinError> {
 	log::warn!(
 		">> You are UPDATING the Workshop item https://steamcommunity.com/sharedfiles/filedetails/?id={} <<\n",

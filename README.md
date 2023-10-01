@@ -9,6 +9,7 @@ An extremely fast reimplementation of gmad.exe and gmpublish.exe.
 ## Features
 
 * Up to **x100 faster** than gmad.exe
+* Publish/update Workshop addons **without creating a .GMA**
 * Create, extract and publish GMAs **all in one tool**
 * Upload addon icons in PNG, JPG or **even GIF format**
 * Drop-in replacement for gmad.exe and gmpublish.exe - **usage is identical**
@@ -45,16 +46,18 @@ fastgmad extract -stdin -out path/to/folder
 
 Publishing GMAs
 ---------------
+>> You can publish .GMAs OR addon directories (a .GMA will be automatically created for you) <<
 >> Adding an icon is OPTIONAL for publishing a new Workshop addon. A default icon will be provided for you if you don't add one. <<
+
 Accepted Icon Formats: JPG, PNG, GIF
 Icon Max Size: 1 MB
 Recommended Icon Dimensions: 512x512
 
-fastgmad publish -addon path/to/gma.gma -icon path/to/icon
-fastgmad update -id 1337 -addon path/to/gma.gma
-fastgmad update -id 1337 -addon path/to/gma.gma -icon path/to/icon
-fastgmad update -id 1337 -addon path/to/gma.gma -changes "fixed something"
-fastgmad update -id 1337 -addon path/to/gma.gma -changes "fixed something" -icon path/to/icon
+fastgmad publish -addon path/to/addon -icon path/to/icon
+fastgmad update -id 1337 -addon path/to/addon
+fastgmad update -id 1337 -addon path/to/addon -icon path/to/icon
+fastgmad update -id 1337 -addon path/to/addon -changes "fixed something"
+fastgmad update -id 1337 -addon path/to/addon -changes "fixed something" -icon path/to/icon
 
 Additional flags
 ----------------

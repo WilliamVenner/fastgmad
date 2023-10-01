@@ -61,17 +61,17 @@ pub enum FastGmadErrorKind {
 	/// Shared library error
 	Libloading(#[from] libloading::Error),
 
-	#[cfg(feature = "workshop")]
+	#[cfg(any(feature = "workshop", feature = "binary"))]
 	#[error("Steam error ({0})")]
 	/// Steam error during publishing
 	SteamError(String),
 
-	#[cfg(feature = "workshop")]
+	#[cfg(any(feature = "workshop", feature = "binary"))]
 	#[error("Icon too large")]
 	/// Icon too large
 	IconTooLarge,
 
-	#[cfg(feature = "workshop")]
+	#[cfg(any(feature = "workshop", feature = "binary"))]
 	#[error("Icon too small")]
 	/// Icon too small
 	IconTooSmall,
