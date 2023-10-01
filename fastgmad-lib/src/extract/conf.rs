@@ -74,7 +74,20 @@ impl ExtractGmaConfig {
 				_ => return Err(PrintHelp(Some("Unknown GMAD extraction argument"))),
 			}
 		}
-		Ok((config, r#in.ok_or(PrintHelp(Some("Please provide an output path")))?))
+
+		let r#in = r#in.ok_or(PrintHelp(Some("Please provide an input path")))?;
+
+		if config.out.as_os_str().is_empty() {
+			if let ExtractGmadIn::File(path) = &r#in {
+				let mut dir = path.to_owned();
+				dir.set_extension("");
+				if !dir.exists() || dir.is_dir() {
+					config.out = dir;
+				}
+			}
+		}
+
+		Ok((config, r#in))
 	}
 }
 impl Default for ExtractGmaConfig {
