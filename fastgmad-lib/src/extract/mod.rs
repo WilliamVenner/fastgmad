@@ -261,16 +261,30 @@ impl ExtractGma for StandardExtractGma {
 				}
 			};
 
-			if let Some(parent) = path.parent() {
-				if parent != conf.out {
-					std::fs::create_dir_all(parent)
-						.map_err(|error| fastgmad_io_error!(while "creating directory for GMA entry", error: error, path: parent))?;
+			let w = (|| {
+				if let Some(parent) = path.parent() {
+					if parent != conf.out {
+						std::fs::create_dir_all(parent)
+							.map_err(|error| fastgmad_io_error!(while "creating directory for GMA entry", error: error, path: parent))?;
+					}
 				}
-			}
+
+				File::create(path).map_err(|error| fastgmad_io_error!(while "creating file for GMA entry", error: error, path: path))
+			})();
+
+			let mut w = match w {
+				Ok(w) => w,
+				Err(err) => {
+					log::warn!("Skipping GMA entry ({err})");
+
+					r.skip(*size as u64)
+						.map_err(|error| fastgmad_io_error!(while "skipping past GMA entry data", error: error))?;
+
+					continue;
+				}
+			};
 
 			let mut take = r.take(*size as u64);
-			let mut w = File::create(path).map_err(|error| fastgmad_io_error!(while "creating file for GMA entry", error: error, path: path))?;
-
 			std::io::copy(&mut take, &mut w).map_err(|error| fastgmad_io_error!(while "copying GMA entry data", error: error, path: path))?;
 
 			w.flush()
@@ -432,7 +446,6 @@ impl GmaEntry {
 						log::info!(
 							"warning: skipping GMA entry with incompatible file path: {:?} ({err})",
 							String::from_utf8_lossy(&path),
-							err
 						);
 						None
 					}
