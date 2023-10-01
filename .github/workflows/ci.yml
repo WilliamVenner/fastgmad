@@ -45,7 +45,7 @@ jobs:
     steps:
     - uses: actions/checkout@v2
     - name: Test
-      run: cargo test --release --package fastgmad
+      run: cargo test --release --package fastgmad -- --nocapture
 
   test_windows:
     name: Test (Windows)
@@ -53,4 +53,4 @@ jobs:
     steps:
     - uses: actions/checkout@v2
     - name: Test
-      run: cargo test --release --package fastgmad
+      run: cargo test --release --package fastgmad -- --nocapture
