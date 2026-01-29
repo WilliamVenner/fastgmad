@@ -79,7 +79,14 @@ const ADDON_WHITELIST_OFFLINE: &[&str] = &[
 	"shaders/*.vcs",
 ];
 
-const ALWAYS_IGNORED: &[&str] = &["models/*.sw.vtx", "models/*.360.vtx", "models/*.xbox.vtx"];
+const ALWAYS_IGNORED: &[&str] = &[
+	"models/*.sw.vtx",
+	"models/*.360.vtx",
+	"models/*.xbox.vtx",
+	"gamemodes/*/content/models/*.sw.vtx",
+	"gamemodes/*/content/models/*.360.vtx",
+	"gamemodes/*/content/models/*.xbox.vtx",
+];
 
 static ADDON_WHITELIST: LazyLock<&'static [&'static str]> = LazyLock::new(download_addon_whitelist);
 
