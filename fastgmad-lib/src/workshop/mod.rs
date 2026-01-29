@@ -13,10 +13,10 @@ mod fastgmad_publish {
 use fastgmad_publish::shared::{CompletedItemUpdate, CreatedItemInterface, ItemUpdate, ItemUpdateStatus, PublishStateInterface};
 
 use crate::{
-	create::CreateGmaConfig,
-	error::{fastgmad_error, fastgmad_io_error, FastGmadError},
-	util::BufReadEx,
 	GMA_MAGIC, GMA_VERSION,
+	create::CreateGmaConfig,
+	error::{FastGmadError, fastgmad_error, fastgmad_io_error},
+	util::BufReadEx,
 };
 use byteorder::ReadBytesExt;
 use std::{
@@ -312,11 +312,9 @@ fn workshop_upload(
 						let new_total = std::num::NonZeroU64::new(new_total);
 						let did_total_change = core::mem::replace(&mut total, new_total) != new_total;
 
-						if did_status_change {
-							if let Some(new_status) = new_status {
-								progress_printer = None; // Reset progress printer so we can print
-								log::info!("{}", update_status_str(&new_status));
-							}
+						if did_status_change && let Some(new_status) = new_status {
+							progress_printer = None; // Reset progress printer so we can print
+							log::info!("{}", update_status_str(&new_status));
 						}
 						if did_status_change || did_total_change {
 							progress_printer = match (noprogress, new_status, new_total) {
@@ -428,7 +426,9 @@ impl ContentPath {
 				let res = std::os::windows::fs::symlink_file(gma_path, &temp_gma_path);
 				match &res {
 					Err(res) if res.kind() == std::io::ErrorKind::PermissionDenied => {
-						log::warn!("Copying .gma to temporary directory for publishing. To skip this in future, run as administrator so that fastgmad can create symlinks.");
+						log::warn!(
+							"Copying .gma to temporary directory for publishing. To skip this in future, run as administrator so that fastgmad can create symlinks."
+						);
 					}
 					_ => {}
 				}
@@ -480,10 +480,10 @@ impl GmaPublishingMetadata {
 		{
 			let mut magic = [0u8; 4];
 			let res = r.read_exact(&mut magic);
-			if let Err(error) = res {
-				if error.kind() != std::io::ErrorKind::UnexpectedEof {
-					return Err(fastgmad_io_error!(while "reading GMA magic bytes", error: error));
-				}
+			if let Err(error) = res
+				&& error.kind() != std::io::ErrorKind::UnexpectedEof
+			{
+				return Err(fastgmad_io_error!(while "reading GMA magic bytes", error: error));
 			}
 			if magic != GMA_MAGIC {
 				return Err(fastgmad_io_error!(error: std::io::Error::new(std::io::ErrorKind::InvalidData, "File is not in GMA format")));

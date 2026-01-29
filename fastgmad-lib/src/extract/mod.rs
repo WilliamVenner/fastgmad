@@ -1,15 +1,15 @@
 use crate::{
-	error::{fastgmad_error, fastgmad_io_error, FastGmadError},
-	util::{BufReadEx, IoSkip},
 	GMA_MAGIC, GMA_VERSION,
+	error::{FastGmadError, fastgmad_error, fastgmad_io_error},
+	util::{BufReadEx, IoSkip},
 };
-use byteorder::{ReadBytesExt, LE};
+use byteorder::{LE, ReadBytesExt};
 use std::{
 	borrow::Cow,
 	fs::File,
 	io::{BufRead, BufWriter, Read, Write},
 	path::{Component, Path, PathBuf},
-	sync::{atomic::AtomicUsize, Mutex},
+	sync::{Mutex, atomic::AtomicUsize},
 };
 
 mod conf;
@@ -61,10 +61,10 @@ trait ExtractGma {
 		{
 			let mut magic = [0u8; 4];
 			let res = r.read_exact(&mut magic);
-			if let Err(error) = res {
-				if error.kind() != std::io::ErrorKind::UnexpectedEof {
-					return Err(fastgmad_io_error!(while "reading GMA magic bytes", error: error));
-				}
+			if let Err(error) = res
+				&& error.kind() != std::io::ErrorKind::UnexpectedEof
+			{
+				return Err(fastgmad_io_error!(while "reading GMA magic bytes", error: error));
 			}
 			if magic != GMA_MAGIC {
 				return Err(fastgmad_io_error!(error: std::io::Error::new(std::io::ErrorKind::InvalidData, "File is not in GMA format")));
@@ -262,11 +262,11 @@ impl ExtractGma for StandardExtractGma {
 			};
 
 			let w = (|| {
-				if let Some(parent) = path.parent() {
-					if parent != conf.out {
-						std::fs::create_dir_all(parent)
-							.map_err(|error| fastgmad_io_error!(while "creating directory for GMA entry", error: error, path: parent))?;
-					}
+				if let Some(parent) = path.parent()
+					&& parent != conf.out
+				{
+					std::fs::create_dir_all(parent)
+						.map_err(|error| fastgmad_io_error!(while "creating directory for GMA entry", error: error, path: parent))?;
 				}
 
 				File::create(path).map_err(|error| fastgmad_io_error!(while "creating file for GMA entry", error: error, path: path))
@@ -365,11 +365,11 @@ impl ExtractGma for ParallelExtractGma {
 					let error = &error;
 					s.spawn(move || {
 						let res = (move || {
-							if let Some(parent) = path.parent() {
-								if parent != conf.out {
-									std::fs::create_dir_all(parent)
-										.map_err(|error| fastgmad_io_error!(while "creating directory for GMA entry", error: error, path: parent))?;
-								}
+							if let Some(parent) = path.parent()
+								&& parent != conf.out
+							{
+								std::fs::create_dir_all(parent)
+									.map_err(|error| fastgmad_io_error!(while "creating directory for GMA entry", error: error, path: parent))?;
 							}
 
 							std::fs::write(path, buf)
@@ -386,11 +386,11 @@ impl ExtractGma for ParallelExtractGma {
 					});
 				} else {
 					// Just do it without buffering
-					if let Some(parent) = path.parent() {
-						if parent != conf.out {
-							std::fs::create_dir_all(parent)
-								.map_err(|error| fastgmad_io_error!(while "creating directory for GMA entry", error: error, path: parent))?;
-						}
+					if let Some(parent) = path.parent()
+						&& parent != conf.out
+					{
+						std::fs::create_dir_all(parent)
+							.map_err(|error| fastgmad_io_error!(while "creating directory for GMA entry", error: error, path: parent))?;
 					}
 
 					let mut take = r.take(*size as u64);
