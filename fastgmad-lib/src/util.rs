@@ -39,29 +39,6 @@ impl<W: Write> WriteEx for W {
 }
 
 pub trait BufReadEx: BufRead {
-	fn skip_until(&mut self, delim: u8) -> Result<usize, std::io::Error> {
-		// https://github.com/rust-lang/rust/pull/98943
-		let mut read = 0;
-		loop {
-			let (done, used) = {
-				let available = match self.fill_buf() {
-					Ok(n) => n,
-					Err(ref e) if e.kind() == std::io::ErrorKind::Interrupted => continue,
-					Err(e) => return Err(e),
-				};
-				match memchr::memchr(delim, available) {
-					Some(i) => (true, i + 1),
-					None => (false, available.len()),
-				}
-			};
-			self.consume(used);
-			read += used;
-			if done || used == 0 {
-				return Ok(read);
-			}
-		}
-	}
-
 	fn read_nul_str<'a>(&mut self, buf: &'a mut Vec<u8>) -> Result<&'a mut [u8], std::io::Error>;
 	fn skip_nul_str(&mut self) -> Result<(), std::io::Error>;
 }
