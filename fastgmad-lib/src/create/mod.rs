@@ -177,7 +177,7 @@ fn discover_entries(folder: &Path, ignore: &[String], warn_invalid: bool) -> Res
 			if let Some(io_error) = error.into_io_error() {
 				fastgmad_io_error!(while "walking directory", error: io_error, path: path)
 			} else {
-				fastgmad_io_error!(while "walking directory", error: std::io::Error::new(std::io::ErrorKind::Other, "unknown"), path: path)
+				fastgmad_io_error!(while "walking directory", error: std::io::Error::other("unknown"), path: path)
 			}
 		})?;
 

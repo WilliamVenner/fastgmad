@@ -68,9 +68,11 @@ lazy_static! {
 fn test_extract_wiremod_parallel() {
 	let wiremod_test_data = &*WIREMOD_TEST_DATA;
 
-	let mut config = ExtractGmaConfig::default();
-	config.out = PathBuf::from(GMA_TEMP_DIR.join(Uuid::new_v4().to_string()));
-	config.max_io_threads = config.max_io_threads.max(NonZeroUsize::new(2).unwrap()); // force parallel
+	let config = ExtractGmaConfig {
+		out: GMA_TEMP_DIR.join(Uuid::new_v4().to_string()),
+		max_io_threads: NonZeroUsize::new(2).unwrap(), // force parallel
+		..Default::default()
+	};
 	fastgmad::extract::extract_gma(&config, &mut BufReader::new(File::open(&wiremod_test_data.gmad_gma).unwrap())).unwrap();
 
 	verify_extracted_wiremod(&config.out, wiremod_test_data);
@@ -80,9 +82,11 @@ fn test_extract_wiremod_parallel() {
 fn test_extract_wiremod_standard() {
 	let wiremod_test_data = &*WIREMOD_TEST_DATA;
 
-	let mut config = ExtractGmaConfig::default();
-	config.out = PathBuf::from(GMA_TEMP_DIR.join(Uuid::new_v4().to_string()));
-	config.max_io_threads = NonZeroUsize::new(1).unwrap(); // force series
+	let config = ExtractGmaConfig {
+		out: GMA_TEMP_DIR.join(Uuid::new_v4().to_string()),
+		max_io_threads: NonZeroUsize::new(1).unwrap(), // force series
+		..Default::default()
+	};
 	fastgmad::extract::extract_gma(&config, &mut BufReader::new(File::open(&wiremod_test_data.gmad_gma).unwrap())).unwrap();
 
 	verify_extracted_wiremod(&config.out, wiremod_test_data);
@@ -109,7 +113,7 @@ fn test_create_wiremod_parallel() {
 	gma_file.seek(SeekFrom::Start(0)).unwrap();
 
 	let mut config = ExtractGmaConfig::default();
-	config.out = PathBuf::from(GMA_TEMP_DIR.join(Uuid::new_v4().to_string()));
+	config.out = GMA_TEMP_DIR.join(Uuid::new_v4().to_string());
 	config.max_io_threads = config.max_io_threads.max(NonZeroUsize::new(2).unwrap()); // force parallel
 	fastgmad::extract::extract_gma(&config, &mut BufReader::new(gma_file)).unwrap();
 
@@ -129,16 +133,21 @@ fn test_create_wiremod_standard() {
 		.open(&out_path)
 		.unwrap();
 
-	let mut config = CreateGmaConfig::default();
-	config.folder = wiremod_test_data.addon_dir.clone();
-	config.max_io_threads = NonZeroUsize::new(1).unwrap(); // force series
+	let config = CreateGmaConfig {
+		folder: wiremod_test_data.addon_dir.clone(),
+		max_io_threads: NonZeroUsize::new(1).unwrap(), // force series
+		..Default::default()
+	};
 
 	fastgmad::create::create_gma(&config, &mut BufWriter::new(&mut gma_file)).unwrap();
 	gma_file.seek(SeekFrom::Start(0)).unwrap();
 
-	let mut config = ExtractGmaConfig::default();
-	config.out = PathBuf::from(GMA_TEMP_DIR.join(Uuid::new_v4().to_string()));
-	config.max_io_threads = NonZeroUsize::new(1).unwrap(); // force series
+	let config = ExtractGmaConfig {
+		out: GMA_TEMP_DIR.join(Uuid::new_v4().to_string()),
+		max_io_threads: NonZeroUsize::new(1).unwrap(), // force series
+		..Default::default()
+	};
+
 	fastgmad::extract::extract_gma(&config, &mut BufReader::new(gma_file)).unwrap();
 
 	verify_extracted_wiremod(&config.out, wiremod_test_data);

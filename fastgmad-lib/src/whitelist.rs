@@ -176,7 +176,7 @@ pub fn test_whitelist() {
 	];
 
 	for good in good {
-		assert!(check(&*good), "{}", good);
+		assert!(check(good), "{}", good);
 	}
 
 	for good in ADDON_WHITELIST {
@@ -188,15 +188,15 @@ pub fn test_whitelist() {
 	}
 
 	for bad in bad {
-		assert!(!check(&*bad));
+		assert!(!check(bad));
 	}
 }
 
 #[test]
 pub fn test_ignore() {
-	assert!(is_ignored(&"lol.txt".to_string(), &["lol.txt".to_string()]));
-	assert!(is_ignored(&"lua/hello.lua".to_string(), &["lua/*.lua".to_string()]));
-	assert!(is_ignored(&"lua/hello.lua".to_string(), &["lua/*".to_string()]));
-	assert!(is_ignored(&".gitattributes".to_string(), &[".git*".to_string()]));
-	assert!(!is_ignored(&"lol.txt".to_string(), &[]));
+	assert!(is_ignored("lol.txt", &["lol.txt".to_string()]));
+	assert!(is_ignored("lua/hello.lua", &["lua/*.lua".to_string()]));
+	assert!(is_ignored("lua/hello.lua", &["lua/*".to_string()]));
+	assert!(is_ignored(".gitattributes", &[".git*".to_string()]));
+	assert!(!is_ignored("lol.txt", &[]));
 }
