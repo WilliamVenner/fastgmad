@@ -34,5 +34,5 @@ winapi = { version = "0.3", features = ["stringapiset"] }
 
 [dev-dependencies]
 lazy_static = "1"
-sysreq = "0.1.6"
+sysreq = "0.1.7"
 zip = "0.6"
