@@ -203,7 +203,7 @@ fn extract(conf: ExtractGmaConfig, r#in: ExtractGmadIn, exit: &mut impl FnMut())
 	Ok(())
 }
 
-#[cfg(any(feature = "binary", feature = "workshop"))]
+#[cfg(feature = "binary")]
 fn publish(conf: WorkshopPublishConfig) -> Result<(), FastGmadBinError> {
 	// TODO allow both creation+publishing in a single command
 	let id = fastgmad::workshop::publish_gma(&conf)?;
@@ -212,7 +212,7 @@ fn publish(conf: WorkshopPublishConfig) -> Result<(), FastGmadBinError> {
 	Ok(())
 }
 
-#[cfg(any(feature = "binary", feature = "workshop"))]
+#[cfg(feature = "binary")]
 fn update(conf: WorkshopUpdateConfig) -> Result<(), FastGmadBinError> {
 	log::warn!(
 		">> You are UPDATING the Workshop item https://steamcommunity.com/sharedfiles/filedetails/?id={} <<\n",
