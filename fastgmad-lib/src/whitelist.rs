@@ -26,17 +26,14 @@ const ADDON_WHITELIST: &[&str] = &[
 	"models/*.phy",
 	"models/*.ani",
 	"models/*.vvd",
-
 	"models/*.vtx",
 	"!models/*.sw.vtx", // These variations are unused by the game
 	"!models/*.360.vtx",
 	"!models/*.xbox.vtx",
-
 	"gamemodes/*/*.txt",
 	"!gamemodes/*/*/*.txt", // Only in the root gamemode folder please!
 	"gamemodes/*/*.fgd",
 	"!gamemodes/*/*/*.fgd",
-
 	"gamemodes/*/logo.png",
 	"gamemodes/*/icon24.png",
 	"gamemodes/*/gamemode/*.lua",
@@ -50,12 +47,10 @@ const ADDON_WHITELIST: &[&str] = &[
 	"gamemodes/*/content/models/*.phy",
 	"gamemodes/*/content/models/*.ani",
 	"gamemodes/*/content/models/*.vvd",
-
 	"gamemodes/*/content/models/*.vtx",
 	"!gamemodes/*/content/models/*.sw.vtx",
 	"!gamemodes/*/content/models/*.360.vtx",
 	"!gamemodes/*/content/models/*.xbox.vtx",
-
 	"gamemodes/*/content/materials/*.vmt",
 	"gamemodes/*/content/materials/*.vtf",
 	"gamemodes/*/content/materials/*.png",
@@ -74,7 +69,6 @@ const ADDON_WHITELIST: &[&str] = &[
 	"gamemodes/*/content/sound/*.wav",
 	"gamemodes/*/content/sound/*.mp3",
 	"gamemodes/*/content/sound/*.ogg",
-
 	// static version of the data/ folder
 	// (because you wouldn't be able to modify these)
 	// We only allow filetypes here that are not already allowed above
@@ -83,7 +77,6 @@ const ADDON_WHITELIST: &[&str] = &[
 	"data_static/*.json",
 	"data_static/*.xml",
 	"data_static/*.csv",
-
 	"shaders/*.vcs",
 ];
 

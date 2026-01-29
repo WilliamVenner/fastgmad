@@ -24,8 +24,7 @@ use std::{
 	collections::BTreeSet,
 	fs::File,
 	io::{BufReader, BufWriter, Read},
-	path::Path,
-	path::PathBuf,
+	path::{Path, PathBuf},
 };
 use uuid::Uuid;
 

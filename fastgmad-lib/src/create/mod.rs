@@ -5,11 +5,9 @@ use crate::{
 };
 use std::{
 	fs::File,
-	io::{Read, SeekFrom},
-	io::{Seek, Write},
+	io::{Read, Seek, SeekFrom, Write},
 	path::{Path, PathBuf},
-	sync::Arc,
-	sync::{atomic::AtomicUsize, Condvar, Mutex},
+	sync::{atomic::AtomicUsize, Arc, Condvar, Mutex},
 	time::SystemTime,
 };
 

@@ -1,6 +1,5 @@
 use shared::{CompletedItemUpdate, CreatedItemInterface, ItemUpdate, ItemUpdateStatus, PublishError, PublishStateInterface};
-use std::rc::Rc;
-use std::time::Duration;
+use std::{rc::Rc, time::Duration};
 
 pub mod shared;
 
