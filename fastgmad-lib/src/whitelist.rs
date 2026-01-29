@@ -1,7 +1,9 @@
 // https://github.com/garrynewman/bootil/blob/beb4cec8ad29533965491b767b177dc549e62d23/src/3rdParty/globber.cpp
 // https://github.com/Facepunch/gmad/blob/master/include/AddonWhiteList.h
 
-const ADDON_WHITELIST: &[&str] = &[
+use std::{sync::LazyLock, time::Duration};
+
+const ADDON_WHITELIST_OFFLINE: &[&str] = &[
 	"lua/*.lua",
 	"scenes/*.vcd",
 	"particles/*.pcf",
@@ -27,11 +29,11 @@ const ADDON_WHITELIST: &[&str] = &[
 	"models/*.ani",
 	"models/*.vvd",
 	"models/*.vtx",
-	"!models/*.sw.vtx", // These variations are unused by the game
+	"!models/*.sw.vtx",
 	"!models/*.360.vtx",
 	"!models/*.xbox.vtx",
 	"gamemodes/*/*.txt",
-	"!gamemodes/*/*/*.txt", // Only in the root gamemode folder please!
+	"!gamemodes/*/*/*.txt",
 	"gamemodes/*/*.fgd",
 	"!gamemodes/*/*/*.fgd",
 	"gamemodes/*/logo.png",
@@ -69,9 +71,6 @@ const ADDON_WHITELIST: &[&str] = &[
 	"gamemodes/*/content/sound/*.wav",
 	"gamemodes/*/content/sound/*.mp3",
 	"gamemodes/*/content/sound/*.ogg",
-	// static version of the data/ folder
-	// (because you wouldn't be able to modify these)
-	// We only allow filetypes here that are not already allowed above
 	"data_static/*.txt",
 	"data_static/*.dat",
 	"data_static/*.json",
@@ -80,8 +79,66 @@ const ADDON_WHITELIST: &[&str] = &[
 	"shaders/*.vcs",
 ];
 
+const ALWAYS_IGNORED: &[&str] = &["models/*.sw.vtx", "models/*.360.vtx", "models/*.xbox.vtx"];
+
+static ADDON_WHITELIST: LazyLock<&'static [&'static str]> = LazyLock::new(download_addon_whitelist);
+
+fn download_addon_whitelist() -> &'static [&'static str] {
+	if std::env::var_os("ADDON_WHITELIST_OFFLINE").is_some() {
+		return ADDON_WHITELIST_OFFLINE;
+	}
+
+	sysreq::RequestBuilder::new("https://raw.githubusercontent.com/Facepunch/gmad/master/include/AddonWhiteList.h")
+		.timeout(Some(Duration::from_secs(2)))
+		.send()
+		.map_err(std::io::Error::other)
+		.and_then(|response| String::from_utf8(response.body).map_err(|err| std::io::Error::new(std::io::ErrorKind::InvalidData, err)))
+		.and_then(|response| {
+			let mut wildcard = Vec::new();
+
+			let captures = regex::Regex::new(r#"static +const +char\* +Wildcard\s*\[\s*\]\s*=\s*\{\s*([\s\S]*?)\s*NULL,?\s*};"#)
+				.unwrap()
+				.captures(response.leak())
+				.and_then(|captures| captures.get(1))
+				.ok_or_else(|| std::io::Error::other("Failed to parse addon whitelist"))?;
+
+			let line_regex = regex::Regex::new(r#""(.+?)","#).unwrap();
+
+			for line in captures.as_str().lines() {
+				let line = line.trim();
+				if line.is_empty() {
+					continue;
+				} else if line == "NULL" {
+					break;
+				} else if let Some(capture) = line_regex.captures(line) {
+					let glob = capture.get(1).unwrap().as_str();
+					wildcard.push(&*glob.to_string().leak());
+				}
+			}
+
+			if wildcard.is_empty() {
+				return Err(std::io::Error::other("Failed to parse addon whitelist (empty)"));
+			}
+
+			if !wildcard.contains(&"lua/*.lua") {
+				// This should definitely be in there, so if it isn't, something has gone wrong. Probably.
+				return Err(std::io::Error::other("Failed to parse addon whitelist (missing lua/*.lua)"));
+			}
+
+			println!("Downloaded up to date addon whitelist: {wildcard:#?}");
+
+			Ok(&*wildcard.leak())
+		})
+		.map_err(|err| {
+			eprintln!("Failed to download addon whitelist: {:#?}", err);
+			err
+		})
+		.unwrap_or(ADDON_WHITELIST_OFFLINE)
+}
+
 const WILD_BYTE: u8 = b'*';
 const QUESTION_BYTE: u8 = b'?';
+const EXCLAMATION_BYTE: u8 = b'!';
 
 fn globber(wild: &str, str: &str) -> bool {
 	unsafe {
@@ -127,17 +184,29 @@ fn globber(wild: &str, str: &str) -> bool {
 
 /// Check if a path is allowed in a GMA file
 pub fn check(str: &str) -> bool {
-	for glob in ADDON_WHITELIST {
+	let mut valid = false;
+
+	for glob in ADDON_WHITELIST.iter() {
+		if glob.as_bytes().first() == Some(&EXCLAMATION_BYTE) {
+			if globber(&glob[1..], str) {
+				valid = false;
+			}
+		} else if !valid && globber(glob, str) {
+			valid = true;
+		}
+	}
+
+	valid
+}
+
+/// Check if a path is ignored by a list of custom globs
+pub fn is_ignored(str: &str, ignore: &[String]) -> bool {
+	for glob in ALWAYS_IGNORED {
 		if globber(glob, str) {
 			return true;
 		}
 	}
 
-	false
-}
-
-/// Check if a path is ignored by a list of custom globs
-pub fn is_ignored(str: &str, ignore: &[String]) -> bool {
 	if ignore.is_empty() {
 		return false;
 	}
@@ -152,8 +221,8 @@ pub fn is_ignored(str: &str, ignore: &[String]) -> bool {
 }
 
 #[test]
-pub fn test_whitelist() {
-	let good: &[&str] = &[
+fn test_whitelist() {
+	let good: &'static [&'static str] = &[
 		"lua/test.lua",
 		"lua/lol/test.lua",
 		"lua/lua/testing.lua",
@@ -164,7 +233,7 @@ pub fn test_whitelist() {
 		"gamemodes/my_base_defence/backgrounds/1.jpg",
 	];
 
-	let bad: &[&str] = &[
+	let bad: &'static [&'static str] = &[
 		"test.lua",
 		"lua/test.exe",
 		"lua/lol/test.exe",
@@ -179,11 +248,17 @@ pub fn test_whitelist() {
 		assert!(check(good), "{}", good);
 	}
 
-	for good in ADDON_WHITELIST {
+	for good in ADDON_WHITELIST.iter() {
+		if good.as_bytes().first() == Some(&EXCLAMATION_BYTE) {
+			continue;
+		}
 		assert!(check(&good.replace('*', "test")));
 	}
 
-	for good in ADDON_WHITELIST {
+	for good in ADDON_WHITELIST.iter() {
+		if good.as_bytes().first() == Some(&EXCLAMATION_BYTE) {
+			continue;
+		}
 		assert!(check(&good.replace('*', "a")));
 	}
 
@@ -193,10 +268,33 @@ pub fn test_whitelist() {
 }
 
 #[test]
-pub fn test_ignore() {
+fn test_ignore() {
 	assert!(is_ignored("lol.txt", &["lol.txt".to_string()]));
 	assert!(is_ignored("lua/hello.lua", &["lua/*.lua".to_string()]));
 	assert!(is_ignored("lua/hello.lua", &["lua/*".to_string()]));
 	assert!(is_ignored(".gitattributes", &[".git*".to_string()]));
 	assert!(!is_ignored("lol.txt", &[]));
+	assert!(is_ignored("models/player.sw.vtx", &[]));
+	assert!(!is_ignored("models/player.vtx", &[]));
+}
+
+#[test]
+fn test_exclusions() {
+	assert!(check("models/player.vtx"));
+	assert!(check("models/weapons/gun.vtx"));
+
+	assert!(!check("models/player.sw.vtx"));
+	assert!(!check("models/player.360.vtx"));
+	assert!(!check("models/player.xbox.vtx"));
+	assert!(!check("models/weapons/gun.sw.vtx"));
+
+	assert!(check("gamemodes/test/content/models/player.vtx"));
+	assert!(!check("gamemodes/test/content/models/player.sw.vtx"));
+	assert!(!check("gamemodes/test/content/models/player.360.vtx"));
+	assert!(!check("gamemodes/test/content/models/player.xbox.vtx"));
+
+	assert!(check("gamemodes/sandbox/info.txt"));
+	assert!(check("gamemodes/sandbox/sandbox.fgd"));
+	assert!(!check("gamemodes/sandbox/nested/info.txt"));
+	assert!(!check("gamemodes/sandbox/entities/weapons/info.txt"));
 }

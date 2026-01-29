@@ -20,6 +20,8 @@ byteorder = "1"
 uuid = { version = "1", features = ["v4"] }
 log = "0.4"
 thiserror = "1"
+sysreq = "0.1.7"
+regex = "1"
 
 # `binary` dependencies
 ctrlc = { version = "3", optional = true }
@@ -34,5 +36,4 @@ winapi = { version = "0.3", features = ["stringapiset"] }
 
 [dev-dependencies]
 lazy_static = "1"
-sysreq = "0.1.7"
 zip = "0.6"
