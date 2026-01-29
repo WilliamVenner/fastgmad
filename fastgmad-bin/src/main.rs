@@ -68,7 +68,9 @@ fn main() {
 				log::error!("Make sure these DLL files are present in the same directory as fastgmad, otherwise Workshop publishing will not work");
 			} else if cfg!(target_os = "linux") {
 				log::error!("fastgmad comes with two additional shared libraries: libsteam_api.so and libfastgmad_publish.so");
-				log::error!("Make sure these shared libraries are present in the same directory & dynamic linker search path as fastgmad, otherwise Workshop publishing will not work");
+				log::error!(
+					"Make sure these shared libraries are present in the same directory & dynamic linker search path as fastgmad, otherwise Workshop publishing will not work"
+				);
 			} else if cfg!(target_os = "macos") {
 				log::error!("fastgmad comes with two additional shared libraries: libsteam_api.dylib and libfastgmad_publish.dylib");
 				log::error!(
@@ -76,14 +78,20 @@ fn main() {
 				);
 			} else {
 				log::error!("fastgmad comes with two additional shared libraries");
-				log::error!("Make sure these shared libraries are present in the same directory & dynamic linker search path as fastgmad, otherwise Workshop publishing will not work");
+				log::error!(
+					"Make sure these shared libraries are present in the same directory & dynamic linker search path as fastgmad, otherwise Workshop publishing will not work"
+				);
 			}
-			log::error!("Additionally, it is not recommended to install fastgmad directly in the bin directory of Garry's Mod, as Garry's Mod itself may use a different version of the Steam API and updates can break this. If you have done this, and replaced files in the process, you may have broken your game and will need to verify integrity cache.");
+			log::error!(
+				"Additionally, it is not recommended to install fastgmad directly in the bin directory of Garry's Mod, as Garry's Mod itself may use a different version of the Steam API and updates can break this. If you have done this, and replaced files in the process, you may have broken your game and will need to verify integrity cache."
+			);
 
 			#[cfg(debug_assertions)]
 			{
 				eprintln!();
-				log::error!("DEBUG ASSERTIONS ARE ON: If you're developing fastgmad, don't forget to type `cargo build --all --features binary` to generate the dependencies. Also, you need to `cargo run` with `--features binary`");
+				log::error!(
+					"DEBUG ASSERTIONS ARE ON: If you're developing fastgmad, don't forget to type `cargo build --all --features binary` to generate the dependencies. Also, you need to `cargo run` with `--features binary`"
+				);
 			}
 
 			eprintln!();

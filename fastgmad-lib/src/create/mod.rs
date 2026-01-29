@@ -1,5 +1,5 @@
 use crate::{
-	error::{fastgmad_error, fastgmad_io_error, FastGmadError},
+	error::{FastGmadError, fastgmad_error, fastgmad_io_error},
 	util::{self, WriteEx},
 	whitelist,
 };
@@ -7,7 +7,7 @@ use std::{
 	fs::File,
 	io::{Read, Seek, SeekFrom, Write},
 	path::{Path, PathBuf},
-	sync::{atomic::AtomicUsize, Arc, Condvar, Mutex},
+	sync::{Arc, Condvar, Mutex, atomic::AtomicUsize},
 	time::SystemTime,
 };
 
