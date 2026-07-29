@@ -148,45 +148,46 @@ const QUESTION_BYTE: u8 = b'?';
 const EXCLAMATION_BYTE: u8 = b'!';
 
 fn globber(wild: &str, str: &str) -> bool {
-	unsafe {
-		let mut cp: *const u8 = core::ptr::null();
-		let mut mp: *const u8 = core::ptr::null();
+	let wild = wild.as_bytes();
+	let str = str.as_bytes();
+	let mut widx = 0;
+	let mut sidx = 0;
+	let mut star_idx = None;
+	let mut saved_sidx = 0;
 
-		let (mut wild, wild_max) = (wild.as_ptr(), wild.as_ptr().add(wild.len()));
-		let (mut str, str_max) = (str.as_ptr(), str.as_ptr().add(str.len()));
-
-		while wild < wild_max && str < str_max && *wild != WILD_BYTE {
-			if *wild != *str && *wild != QUESTION_BYTE {
-				return false;
-			}
-			wild = wild.add(1);
-			str = str.add(1);
+	while widx < wild.len() && sidx < str.len() && wild[widx] != WILD_BYTE {
+		if wild[widx] != str[sidx] && wild[widx] != QUESTION_BYTE {
+			return false;
 		}
-
-		while str < str_max {
-			if *wild == WILD_BYTE {
-				wild = wild.add(1);
-				if wild >= wild_max {
-					return true;
-				}
-				mp = wild;
-				cp = str.add(1);
-			} else if *wild == *str || *wild == QUESTION_BYTE {
-				wild = wild.add(1);
-				str = str.add(1);
-			} else {
-				wild = mp;
-				str = cp;
-				cp = cp.add(1);
-			}
-		}
-
-		while wild < wild_max && *wild == WILD_BYTE {
-			wild = wild.add(1);
-		}
-
-		wild >= wild_max
+		widx += 1;
+		sidx += 1;
 	}
+
+	while sidx < str.len() {
+		if widx < wild.len() && wild[widx] == WILD_BYTE {
+			widx += 1;
+			if widx >= wild.len() {
+				return true;
+			}
+			star_idx = Some(widx);
+			saved_sidx = sidx + 1;
+		} else if widx < wild.len() && (wild[widx] == str[sidx] || wild[widx] == QUESTION_BYTE) {
+			widx += 1;
+			sidx += 1;
+		} else if let Some(star_pos) = star_idx {
+			widx = star_pos;
+			sidx = saved_sidx;
+			saved_sidx += 1;
+		} else {
+			return false;
+		}
+	}
+
+	while widx < wild.len() && wild[widx] == WILD_BYTE {
+		widx += 1;
+	}
+
+	widx >= wild.len()
 }
 
 /// Check if a path is allowed in a GMA file
